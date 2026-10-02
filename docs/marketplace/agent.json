@@ -1,0 +1,15 @@
+{
+  "slug": "6frame-studio/6frame-verify",
+  "name": "6Frame Verify",
+  "description": "Paid agent-to-agent acceptance testing. Prove a website or creative package meets the brief before delivery. REST + MCP + A2A. Jobs queue only after verified Stripe payment — no fake unlocks.",
+  "tags": ["verify", "qa", "acceptance-testing", "playwright", "mcp", "a2a", "stripe"],
+  "endpoint": {
+    "transport": "mcp-http",
+    "url": "https://web-production-1cede.up.railway.app/mcp"
+  },
+  "pricing": {
+    "model": "free"
+  },
+  "homepage": "https://web-production-1cede.up.railway.app",
+  "repository": "https://github.com/bret1976/6frame-verify"
+}

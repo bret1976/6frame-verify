@@ -1,39 +1,34 @@
-# 6Frame Verify — Stripe live setup (6Frame Studio acct_1TRFwqJVjV19Q08E)
+# 6Frame Verify — Stripe live setup (acct_1TRFwqJVjV19Q08E)
 
-MCP write for Products is currently denied. Bret must either:
-1. Open the MCP reconsent URL and grant **write** (Products, Prices, Webhook Endpoints), then re-run creation; or
-2. Create Products/Prices + webhook in Dashboard (below).
+## Products / Prices (LIVE — created)
 
-## A) Grant MCP write (preferred)
-Open: https://access.stripe.com/mcp/oauth2/authorize/sessions/oases_VMuZiKreeScH1E  
-Grant product/price/webhook write, then ask agent to create SKUs.
+| SKU | Price ID | Amount |
+|---|---|---:|
+| website_quick | `price_1UMAmFJVjV19Q08E8eiXT3ZD` | $3 |
+| website_full | `price_1UMAmLJVjV19Q08E4Fn2FDgt` | $12 |
+| creative_pack (creative_prompt) | `price_1UMAmLJVjV19Q08EuhXTTGkr` | $6 |
+| creative_sequence | `price_1UMAmNJVjV19Q08ENmggLHa7` | $25 |
+| credit_pack | `price_1UMAmOJVjV19Q08ES60Rvnhi` | $100 |
 
-## B) Dashboard Products (Live mode)
-Create these one-time Prices (USD):
+Webhook endpoint: `we_1UMAmbJVjV19Q08EMuLsk5H3`  
+URL: `https://web-production-1cede.up.railway.app/v1/webhooks/stripe`
 
-| Product name | Amount | metadata.sku |
-|---|---:|---|
-| 6Frame Verify — Website Quick Check | $3.00 | website_quick |
-| 6Frame Verify — Website Full Acceptance | $12.00 | website_full |
-| 6Frame Verify — Creative Prompt/Continuity Pack | $6.00 | creative_pack |
-| 6Frame Verify — Creative Sequence Acceptance | $25.00 | creative_sequence |
-| 6Frame Verify — Prepaid Credit Pack | $100.00 | credit_pack (usable $110) |
+## Railway env (web service) — DONE for price IDs
+- `STRIPE_PRICE_WEBSITE_QUICK` = price_1UMAmFJVjV19Q08E8eiXT3ZD
+- `STRIPE_PRICE_WEBSITE_FULL` = price_1UMAmLJVjV19Q08E4Fn2FDgt
+- `STRIPE_PRICE_CREATIVE_PACK` = price_1UMAmLJVjV19Q08EuhXTTGkr
+- `STRIPE_PRICE_CREATIVE_SEQUENCE` = price_1UMAmNJVjV19Q08ENmggLHa7
+- `STRIPE_PRICE_CREDIT_PACK` = price_1UMAmOJVjV19Q08ES60Rvnhi
+- `STRIPE_WEBHOOK_SECRET` = (Bret setting from webhook signing secret)
 
-## C) Webhook endpoint
-- URL: `https://web-production-1cede.up.railway.app/v1/webhooks/stripe`
-- Events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `payment_intent.succeeded`, `charge.refunded`, `payment_intent.canceled`
-- Copy Signing secret → Railway `STRIPE_WEBHOOK_SECRET` (`whsec_...`)
+## Still required for payments.configured=true
+From Stripe Dashboard → Developers → API keys (Live mode):
+1. Set `STRIPE_SECRET_KEY` = `sk_live_...` on Railway **web** (and worker if needed)
+2. Set `STRIPE_PUBLISHABLE_KEY` = `pk_live_...` on Railway **web**
+3. Confirm `STRIPE_WEBHOOK_SECRET` = `whsec_...` matches webhook `we_1UMAmbJVjV19Q08EMuLsk5H3`
 
-## D) Railway variables (web + worker)
-From Dashboard → Developers → API keys (Live):
-- `STRIPE_SECRET_KEY` = `sk_live_...`
-- `STRIPE_PUBLISHABLE_KEY` = `pk_live_...`
-- `STRIPE_WEBHOOK_SECRET` = `whsec_...`
-- Optional price IDs: `STRIPE_PRICE_WEBSITE_QUICK`, `STRIPE_PRICE_WEBSITE_FULL`, `STRIPE_PRICE_CREATIVE_PACK`, `STRIPE_PRICE_CREATIVE_SEQUENCE`, `STRIPE_PRICE_CREDIT_PACK`
+Do **not** invent or paste keys into git. After set, redeploy web and verify:
+`GET /v1/capabilities` → `payments.configured: true`, `mode: live`
 
-Never commit keys. Never fake-unlock jobs.
-
-## E) Smoke after secrets
-1. `GET /v1/capabilities` → `payments.configured: true`, `mode: live`
-2. Create quote → order (checkout) → pay → webhook → `order.status=paid`
-3. `POST /v1/jobs` only then queues
+## MCP write reconsent (optional)
+If agent should manage Products again: https://access.stripe.com/mcp/oauth2/authorize/sessions/oases_VMuZiKreeScH1E
