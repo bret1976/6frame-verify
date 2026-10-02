@@ -92,6 +92,34 @@ async function main() {
     ccId,
   ]);
 
+  // Optional bootstrap API key for ops smoke tests (never a Stripe secret)
+  const bootstrap = process.env.BOOTSTRAP_API_KEY?.trim();
+  if (bootstrap?.startsWith("fv_live_")) {
+    const buyer = await pool.query(`SELECT id FROM tenants WHERE name='Demo Buyer' LIMIT 1`);
+    if (buyer.rows[0]) {
+      const prefix = bootstrap.slice(0, "fv_live_".length + 8);
+      const existing = await pool.query(
+        `SELECT id FROM api_clients WHERE key_prefix=$1 LIMIT 1`,
+        [prefix],
+      );
+      if (!existing.rows[0]) {
+        const argon2 = await import("argon2");
+        const key_hash = await argon2.default.hash(bootstrap, { type: argon2.default.argon2id });
+        await pool.query(
+          `INSERT INTO api_clients (tenant_id, name, key_prefix, key_hash, scopes)
+           VALUES ($1,'Bootstrap smoke key',$2,$3,$4)`,
+          [
+            buyer.rows[0].id,
+            prefix,
+            key_hash,
+            ["verify:read", "verify:write", "billing:write"],
+          ],
+        );
+        console.log("bootstrap api key installed", { prefix });
+      }
+    }
+  }
+
   console.log("seed complete", { website: waId, creative: ccId });
   await pool.end();
 }
