@@ -1,0 +1,20 @@
+{
+  "name": "6frame-verify",
+  "version": "1.0.0",
+  "description": "CLI for 6Frame Verify",
+  "type": "module",
+  "bin": {
+    "6frame-verify": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@6frame/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

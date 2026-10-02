@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm"]
+
+[phases.install]
+cmds = ["pnpm install"]
+
+[phases.build]
+cmds = [
+  "pnpm --filter @6frame/config build",
+  "pnpm --filter @6frame/contracts build",
+  "pnpm --filter @6frame/evaluators build",
+  "pnpm --filter @6frame/web build"
+]
+
+[start]
+cmd = "pnpm --filter @6frame/web db:migrate && pnpm --filter @6frame/web seed && pnpm --filter @6frame/web start"

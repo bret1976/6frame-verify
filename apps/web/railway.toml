@@ -1,0 +1,10 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "cd ../.. && corepack enable && pnpm install && pnpm --filter @6frame/config build && pnpm --filter @6frame/contracts build && pnpm --filter @6frame/evaluators build && pnpm --filter @6frame/web build"
+watchPatterns = ["apps/web/**", "packages/**", "db/**"]
+
+[deploy]
+startCommand = "cd apps/web && pnpm db:migrate && pnpm seed && pnpm start"
+healthcheckPath = "/api/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

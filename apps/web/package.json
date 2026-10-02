@@ -1,0 +1,38 @@
+{
+  "name": "@6frame/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:migrate": "tsx src/scripts/migrate.ts",
+    "seed": "tsx src/scripts/seed.ts",
+    "create-key": "tsx src/scripts/create-key.ts"
+  },
+  "dependencies": {
+    "@6frame/config": "workspace:*",
+    "@6frame/contracts": "workspace:*",
+    "@6frame/evaluators": "workspace:*",
+    "argon2": "^0.41.1",
+    "bullmq": "^5.41.0",
+    "ioredis": "^5.5.0",
+    "next": "^15.2.4",
+    "pg": "^8.14.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "stripe": "^17.7.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.11.11",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

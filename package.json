@@ -1,0 +1,25 @@
+{
+  "name": "6frame-verify",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Paid agent-to-agent acceptance-testing API by 6Frame Studio",
+  "packageManager": "pnpm@10.33.4",
+  "scripts": {
+    "build": "pnpm -r --filter=./packages/* build && pnpm -r --filter=./apps/* build",
+    "dev:web": "pnpm --filter @6frame/web dev",
+    "dev:worker": "pnpm --filter @6frame/worker dev",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @6frame/web db:migrate",
+    "lint": "pnpm -r lint"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "argon2",
+      "esbuild",
+      "msgpackr-extract"
+    ]
+  }
+}
