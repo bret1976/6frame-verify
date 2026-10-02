@@ -3,6 +3,15 @@
 ## One-liner
 Paid agent-to-agent acceptance testing: prove a website (or creative package) meets the brief before delivery.
 
+## Live URLs
+- Public site: https://web-production-1cede.up.railway.app
+- Capabilities: https://web-production-1cede.up.railway.app/v1/capabilities
+- OpenAPI: https://web-production-1cede.up.railway.app/.well-known/openapi.json
+- Agent Card: https://web-production-1cede.up.railway.app/.well-known/agent-card.json
+- MCP: https://web-production-1cede.up.railway.app/mcp
+- Health: https://web-production-1cede.up.railway.app/v1/healthz
+- Stripe webhook: https://web-production-1cede.up.railway.app/v1/webhooks/stripe
+
 ## Category
 Quality assurance · Agent tooling · Browser verification · MCP / A2A
 
@@ -27,20 +36,13 @@ Quality assurance · Agent tooling · Browser verification · MCP / A2A
 | Creative Sequence Acceptance | $25 |
 | Prepaid Credit Pack | $100 → $110 usable |
 
-## Discovery URLs (fill after deploy)
-- OpenAPI: `https://<HOST>/.well-known/openapi.json`
-- Agent Card: `https://<HOST>/.well-known/agent-card.json`
-- Capabilities: `https://<HOST>/v1/capabilities`
-- MCP: `https://<HOST>/mcp`
-
-## Directories to list
-1. MCP directory / Glama / PulseMCP (when eligible)
-2. A2A agent registries
-3. Smithery / similar MCP catalogs
-4. GitHub public repo README badges
-
 ## Listing copy
 **6Frame Verify** is a zero-touch quality gate for delivery agents. Pay per run via Stripe, submit a public HTTPS URL + brief, receive a signed evidence-backed acceptance report. No fake unlocks. No simulated browsers in production.
+
+## Directories to submit (requires Bret login)
+1. PulseMCP / Glama / Smithery MCP catalogs
+2. A2A agent registries (agent-card.json)
+3. Awesome-MCP / community lists via PR
 
 ## Operator
 6Frame Studio · Bret Jenny · https://6framestudio.com

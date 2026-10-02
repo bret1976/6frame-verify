@@ -1,0 +1,13 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "pnpm install && pnpm --filter @6frame/config build && pnpm --filter @6frame/contracts build && pnpm --filter @6frame/evaluators build && pnpm --filter @6frame/web build"
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @6frame/web db:migrate && pnpm --filter @6frame/web seed && pnpm --filter @6frame/web start",
+    "healthcheckPath": "/api/healthz",
+    "healthcheckTimeout": 90,
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
