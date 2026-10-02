@@ -1,5 +1,11 @@
 import pg from "pg";
-import { SKU_PRICES_CENTS } from "@6frame/contracts";
+
+const SKU_PRICES_CENTS = {
+  website_quick: 300,
+  website_full: 1200,
+  creative_pack: 600,
+  creative_sequence: 2500,
+};
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -9,29 +15,17 @@ async function main() {
     ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
   });
 
-  // Admin tenant
-  const admin = await pool.query(
+  await pool.query(
     `INSERT INTO tenants (name, type, status)
-     VALUES ('6Frame Studio', 'admin', 'active')
-     ON CONFLICT DO NOTHING
-     RETURNING id`,
+     SELECT '6Frame Studio', 'admin', 'active'
+     WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE type='admin')`,
   );
-  let adminId = admin.rows[0]?.id as string | undefined;
-  if (!adminId) {
-    const existing = await pool.query(
-      `SELECT id FROM tenants WHERE type='admin' ORDER BY created_at ASC LIMIT 1`,
-    );
-    adminId = existing.rows[0]?.id;
-  }
-
-  // Demo buyer tenant (for docs / smoke — no payment unlock)
   await pool.query(
     `INSERT INTO tenants (name, type, status)
      SELECT 'Demo Buyer', 'buyer', 'active'
      WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE name='Demo Buyer')`,
   );
 
-  // Website Acceptance profile
   const wa = await pool.query(
     `INSERT INTO profiles (slug, enabled)
      VALUES ('website-acceptance', true)
@@ -50,35 +44,14 @@ async function main() {
      RETURNING id`,
     [
       waId,
-      JSON.stringify({
-        input: "WebsiteAcceptanceInput",
-        checks: [
-          "availability",
-          "requirements",
-          "interaction",
-          "responsive",
-          "brand",
-          "seo",
-          "evidence",
-        ],
-      }),
+      JSON.stringify({ input: "WebsiteAcceptanceInput" }),
       JSON.stringify({
         skus: {
-          website_quick: {
-            amount_cents: SKU_PRICES_CENTS.website_quick,
-            max_urls: 1,
-            max_viewports: 2,
-            max_requirements: 20,
-          },
-          website_full: {
-            amount_cents: SKU_PRICES_CENTS.website_full,
-            max_urls: 10,
-            max_viewports: 3,
-            max_requirements: 100,
-          },
+          website_quick: { amount_cents: SKU_PRICES_CENTS.website_quick, max_urls: 1 },
+          website_full: { amount_cents: SKU_PRICES_CENTS.website_full, max_urls: 10 },
         },
       }),
-      JSON.stringify({ engine: "playwright-deterministic@1.0.0", semantic: false }),
+      JSON.stringify({ engine: "playwright-deterministic@1.0.0" }),
     ],
   );
   await pool.query(`UPDATE profiles SET current_published_version_id=$1 WHERE id=$2`, [
@@ -86,7 +59,6 @@ async function main() {
     waId,
   ]);
 
-  // Creative Continuity profile (schema + stub)
   const cc = await pool.query(
     `INSERT INTO profiles (slug, enabled)
      VALUES ('creative-continuity', true)
@@ -109,10 +81,7 @@ async function main() {
       JSON.stringify({
         skus: {
           creative_pack: { amount_cents: SKU_PRICES_CENTS.creative_pack, max_shots: 12 },
-          creative_sequence: {
-            amount_cents: SKU_PRICES_CENTS.creative_sequence,
-            max_shots: 30,
-          },
+          creative_sequence: { amount_cents: SKU_PRICES_CENTS.creative_sequence, max_shots: 30 },
         },
       }),
       JSON.stringify({ engine: "creative-stub@1.0.0", evaluable: false }),
@@ -123,7 +92,7 @@ async function main() {
     ccId,
   ]);
 
-  console.log("seed complete", { adminId, website: waId, creative: ccId });
+  console.log("seed complete", { website: waId, creative: ccId });
   await pool.end();
 }
 

@@ -7,7 +7,7 @@
   "deploy": {
     "startCommand": "pnpm --filter @6frame/web db:migrate && pnpm --filter @6frame/web seed && pnpm --filter @6frame/web start",
     "healthcheckPath": "/api/healthz",
-    "healthcheckTimeout": 90,
+    "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE"
   }
 }
