@@ -11,6 +11,14 @@ import { sha256 } from "@/lib/crypto";
 import { jsonOk, jsonError } from "@/lib/http";
 import { loadIdempotentResponse, saveIdempotentResponse } from "@/lib/idempotency";
 import { audit } from "@/lib/audit";
+import {
+  findReusableOpenQuote,
+  buildQuoteResponse,
+  recordReuseHit,
+  recordCreateHit,
+  noteRecentCollision,
+  reuseEnabled,
+} from "@/lib/quote-reuse";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +70,30 @@ export async function POST(req: Request) {
   if (!pv[0]) return jsonError("profile_unavailable", "Profile not published", { status: 404 });
 
   const inputHash = sha256(JSON.stringify(data.input));
+
+  // quote-reuse-v1: reuse an existing open non-expired quote for same tenant+hash
+  if (reuseEnabled()) {
+    const existing = await findReusableOpenQuote(auth.tenantId, inputHash);
+    if (existing) {
+      const response = buildQuoteResponse(existing, { reused: true, inputHash });
+      recordReuseHit(existing.id);
+      await saveIdempotentResponse(auth, idem, "POST", "/v1/quotes", data, 200, response);
+      await audit({
+        tenant_id: auth.tenantId,
+        actor_type: "api_client",
+        actor_id: auth.clientId,
+        action: "quote.reused",
+        object_type: "quote",
+        object_id: existing.id,
+        metadata: { pack: "quote-reuse-v1", input_hash: inputHash },
+      });
+      return jsonOk(response);
+    }
+  }
+
+  // Soft-note collisions with recently accepted/expired identical hashes (ops only)
+  await noteRecentCollision(auth.tenantId, inputHash).catch(() => null);
+
   const expires = new Date(Date.now() + 30 * 60 * 1000);
   const { rows } = await query(
     `INSERT INTO quotes (tenant_id, profile_version_id, sku, normalized_input_hash, quote_amount, currency, input_json, expires_at, status)
@@ -69,6 +101,7 @@ export async function POST(req: Request) {
     [auth.tenantId, pv[0].id, sku, inputHash, amount, JSON.stringify(data.input), expires.toISOString()],
   );
   const quote = rows[0];
+  recordCreateHit();
   const response = {
     id: quote.id,
     sku: quote.sku,
