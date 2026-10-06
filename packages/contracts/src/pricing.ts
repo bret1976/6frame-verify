@@ -27,3 +27,29 @@ export const SKU_LABELS: Record<PricingSku, string> = {
 };
 
 export const CREDIT_PACK_USABLE_CENTS = 11000;
+
+/**
+ * SKUs currently SOLD. Creative SKUs (creative_pack $6, creative_sequence $25) are backed by
+ * a stub evaluator (creative-stub) that returns not_evaluable for every shot, so they are
+ * NOT offered and must never be quoted, ordered, or charged until a real evaluator ships.
+ */
+export const OFFERED_SKUS = ["website_quick", "website_full", "credit_pack"] as const;
+export type OfferedSku = (typeof OFFERED_SKUS)[number];
+export const DISABLED_SKUS: readonly PricingSku[] = ["creative_pack", "creative_sequence"];
+
+export function isSkuOffered(sku: string | null | undefined): sku is OfferedSku {
+  return !!sku && (OFFERED_SKUS as readonly string[]).includes(sku);
+}
+
+/** Profiles currently sold. creative-continuity is hidden while its evaluator is a stub. */
+export const OFFERED_PROFILES = ["website-acceptance"] as const;
+export function isProfileOffered(slug: string | null | undefined): boolean {
+  return !!slug && (OFFERED_PROFILES as readonly string[]).includes(slug);
+}
+
+/** Public SKU catalog (offered SKUs only). */
+export function offeredSkuCatalog(): Record<OfferedSku, { label: string; amount_cents: number; currency: "usd" }> {
+  return Object.fromEntries(
+    OFFERED_SKUS.map((k) => [k, { label: SKU_LABELS[k], amount_cents: SKU_PRICES_CENTS[k], currency: "usd" as const }]),
+  ) as Record<OfferedSku, { label: string; amount_cents: number; currency: "usd" }>;
+}

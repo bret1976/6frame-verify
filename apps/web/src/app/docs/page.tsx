@@ -33,7 +33,7 @@ export default function DocsPage() {
       <p>
         Full OpenAPI: <a href="/.well-known/openapi.json">/.well-known/openapi.json</a>
       </p>
-      <div className="footer">Changelog: v1.0.0 Website Acceptance · Creative stub</div>
+      <div className="footer">Changelog: v1.0.0 Website Acceptance · Creative continuity not offered</div>
     </div>
   );
 }

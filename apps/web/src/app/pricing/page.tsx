@@ -1,8 +1,8 @@
 import { Nav } from "@/components/Nav";
-import { SKU_LABELS, SKU_PRICES_CENTS, type PricingSku } from "@6frame/contracts";
+import { OFFERED_SKUS, SKU_LABELS, SKU_PRICES_CENTS } from "@6frame/contracts";
 
 export default function PricingPage() {
-  const skus = Object.keys(SKU_PRICES_CENTS) as PricingSku[];
+  const skus = OFFERED_SKUS;
   return (
     <div className="wrap">
       <Nav />

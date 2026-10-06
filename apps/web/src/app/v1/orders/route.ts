@@ -1,4 +1,4 @@
-import { OrderRequestSchema } from "@6frame/contracts";
+import { OrderRequestSchema, isSkuOffered } from "@6frame/contracts";
 import { authenticateBearer, requireScope } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { jsonOk, jsonError } from "@/lib/http";
@@ -38,6 +38,9 @@ export async function POST(req: Request) {
   const quote = quotes[0];
   if (!quote) return jsonError("quote_not_found", "Quote not found", { status: 404 });
   if (quote.status !== "open") return jsonError("quote_not_open", "Quote is not open", { status: 409 });
+  if (!isSkuOffered(quote.sku)) {
+    return jsonError("sku_unavailable", `SKU ${quote.sku} is not currently offered`, { status: 422 });
+  }
   if (new Date(quote.expires_at) < new Date()) {
     await query(`UPDATE quotes SET status='expired' WHERE id=$1`, [quote.id]);
     return jsonError("quote_expired", "Quote expired", { status: 409 });

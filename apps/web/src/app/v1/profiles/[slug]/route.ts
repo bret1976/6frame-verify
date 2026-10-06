@@ -1,3 +1,4 @@
+import { isProfileOffered } from "@6frame/contracts";
 import { query } from "@/lib/db";
 import { jsonOk, jsonError } from "@/lib/http";
 
@@ -8,6 +9,9 @@ export async function GET(
   ctx: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await ctx.params;
+  if (!isProfileOffered(slug)) {
+    return jsonError("not_found", `Profile ${slug} not found`, { status: 404 });
+  }
   const { rows } = await query(
     `SELECT p.slug, p.enabled, pv.version, pv.schema_json, pv.pricing_config, pv.evaluator_config, pv.published_at
      FROM profiles p

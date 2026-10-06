@@ -19,11 +19,19 @@ export function stripeStatus() {
   return {
     configured: isStripeReady(),
     publishable_key_present: Boolean(e.STRIPE_PUBLISHABLE_KEY),
-    mode: e.STRIPE_SECRET_KEY?.startsWith("sk_live_")
+    // Accept standard (sk_) and restricted (rk_) keys.
+    mode: /^(sk|rk)_live_/.test(e.STRIPE_SECRET_KEY ?? "")
       ? "live"
-      : e.STRIPE_SECRET_KEY?.startsWith("sk_test_")
+      : /^(sk|rk)_test_/.test(e.STRIPE_SECRET_KEY ?? "")
         ? "test"
-        : "unset",
+        : e.STRIPE_SECRET_KEY
+          ? "unknown"
+          : "unset",
+    key_type: e.STRIPE_SECRET_KEY?.startsWith("rk_")
+      ? "restricted"
+      : e.STRIPE_SECRET_KEY?.startsWith("sk_")
+        ? "standard"
+        : null,
   };
 }
 

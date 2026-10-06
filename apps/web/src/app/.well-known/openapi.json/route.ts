@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { OFFERED_PROFILES, OFFERED_SKUS, offeredSkuCatalog } from "@6frame/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,12 @@ export async function GET() {
       title: "6Frame Verify API",
       version: "1.0.0",
       description:
-        "Paid agent-to-agent acceptance-testing API. Jobs queue only after verified Stripe payment or credit reservation.",
+        "Paid agent-to-agent website acceptance-testing API. Jobs queue only after verified Stripe payment or credit reservation. Offered SKUs: website_quick ($3), website_full ($12), credit_pack ($100).",
       contact: { name: "6Frame Studio", url: "https://6framestudio.com" },
     },
     servers: [{ url: base }],
+    "x-offered-skus": offeredSkuCatalog(),
+    "x-offered-profiles": OFFERED_PROFILES,
     paths: {
       "/v1/capabilities": {
         get: {
@@ -30,6 +33,28 @@ export async function GET() {
         post: {
           summary: "Create quote",
           security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["profile", "input"],
+                  properties: {
+                    profile: {
+                      type: "object",
+                      properties: {
+                        slug: { type: "string", enum: [...OFFERED_PROFILES] },
+                        version: { type: "string" },
+                      },
+                    },
+                    sku: { type: "string", enum: [...OFFERED_SKUS] },
+                    input: { type: "object" },
+                  },
+                },
+              },
+            },
+          },
           parameters: [
             {
               name: "Idempotency-Key",
@@ -38,7 +63,10 @@ export async function GET() {
               schema: { type: "string" },
             },
           ],
-          responses: { "200": { description: "Quote" } },
+          responses: {
+            "200": { description: "Quote" },
+            "422": { description: "Invalid input, or SKU/profile not currently offered" },
+          },
         },
       },
       "/v1/orders": {

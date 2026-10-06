@@ -61,8 +61,8 @@ async function main() {
 
   const cc = await pool.query(
     `INSERT INTO profiles (slug, enabled)
-     VALUES ('creative-continuity', true)
-     ON CONFLICT (slug) DO UPDATE SET enabled=true
+     VALUES ('creative-continuity', false)
+     ON CONFLICT (slug) DO UPDATE SET enabled=false
      RETURNING id`,
   );
   const ccId = cc.rows[0].id as string;

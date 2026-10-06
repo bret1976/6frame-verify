@@ -30,10 +30,10 @@ export default function HomePage() {
           </p>
         </div>
         <div className="card">
-          <h3>Creative Continuity</h3>
+          <h3>Prepaid Credits</h3>
           <p>
-            Schema shipped; evaluator returns <span className="mono">not_evaluable</span> until
-            Phase 3 media/vision scoring. No fake passes.
+            $100 credit pack → $110 usable balance for repeat website checks. Creative
+            continuity checks are not sold until the media evaluator ships.
           </p>
         </div>
         <div className="card">

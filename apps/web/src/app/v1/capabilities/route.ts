@@ -1,4 +1,4 @@
-import { SKU_LABELS, SKU_PRICES_CENTS } from "@6frame/contracts";
+import { DISABLED_SKUS, isProfileOffered, offeredSkuCatalog } from "@6frame/contracts";
 import { authenticateBearer } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { jsonOk, jsonError } from "@/lib/http";
@@ -39,13 +39,8 @@ export async function GET(req: Request) {
       ...stripeStatus(),
       note: "Jobs queue only after verified Stripe webhook payment or atomic credit reservation. Unpaid jobs are refused.",
     },
-    skus: Object.fromEntries(
-      (Object.keys(SKU_PRICES_CENTS) as (keyof typeof SKU_PRICES_CENTS)[]).map((k) => [
-        k,
-        { label: SKU_LABELS[k], amount_cents: SKU_PRICES_CENTS[k], currency: "usd" },
-      ]),
-    ),
-    profiles: profiles.map((p) => ({
+    skus: offeredSkuCatalog(),
+    profiles: profiles.filter((p) => isProfileOffered(p.slug)).map((p) => ({
       slug: p.slug,
       version: p.version,
       enabled: p.enabled,

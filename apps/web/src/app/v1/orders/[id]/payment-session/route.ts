@@ -1,3 +1,4 @@
+import { isSkuOffered } from "@6frame/contracts";
 import { authenticateBearer } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { jsonOk, jsonError } from "@/lib/http";
@@ -24,6 +25,9 @@ export async function POST(
   if (!order) return jsonError("not_found", "Order not found", { status: 404 });
   if (order.status === "paid" || order.status === "credit_reserved") {
     return jsonOk({ id: order.id, status: order.status, already_paid: true });
+  }
+  if (!isSkuOffered(order.sku)) {
+    return jsonError("sku_unavailable", `SKU ${order.sku} is not currently offered`, { status: 422 });
   }
   const stripe = getStripe()!;
   const base = env().APP_BASE_URL;

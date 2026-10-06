@@ -2,6 +2,7 @@ import {
   JobCreateRequestSchema,
   WebsiteAcceptanceInputSchema,
   CreativeContinuityInputSchema,
+  isProfileOffered,
 } from "@6frame/contracts";
 import { assertSafePublicHttpsUrl, compileWebsiteBrief } from "@6frame/evaluators";
 import { authenticateBearer, requireScope } from "@/lib/auth";
@@ -61,6 +62,14 @@ export async function POST(req: Request) {
     const response = { id: existing[0].id, status: existing[0].status, reused: true };
     await saveIdempotentResponse(auth, idem, "POST", "/v1/jobs", data, 200, response);
     return jsonOk(response);
+  }
+
+  if (!isProfileOffered(data.profile.slug)) {
+    return jsonError(
+      "profile_unavailable",
+      `Profile ${data.profile.slug} is not currently offered`,
+      { status: 422 },
+    );
   }
 
   if (data.profile.slug === "website-acceptance") {

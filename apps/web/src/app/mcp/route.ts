@@ -1,6 +1,6 @@
 import { authenticateBearer, requireScope } from "@/lib/auth";
 import { jsonOk, jsonError } from "@/lib/http";
-import { SKU_LABELS, SKU_PRICES_CENTS } from "@6frame/contracts";
+import { OFFERED_PROFILES, offeredSkuCatalog } from "@6frame/contracts";
 import { stripeStatus } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +24,12 @@ export async function POST(req: Request) {
       tools: [
         {
           name: "verify_get_capabilities",
-          description: "Profiles, price/rate limits",
+          description: "Profiles, price/rate limits (website_quick $3, website_full $12, credit_pack $100)",
           inputSchema: { type: "object", properties: {} },
         },
         {
           name: "verify_quote",
-          description: "Create quote — use REST POST /v1/quotes with same payload",
+          description: "Create website-acceptance quote — use REST POST /v1/quotes with same payload",
           inputSchema: { type: "object", properties: { profile: {}, input: {} } },
         },
         {
@@ -74,8 +74,8 @@ export async function POST(req: Request) {
             type: "text",
             text: JSON.stringify(
               {
-                skus: SKU_PRICES_CENTS,
-                labels: SKU_LABELS,
+                skus: offeredSkuCatalog(),
+                profiles: OFFERED_PROFILES,
                 payments: stripeStatus(),
                 rest: "/v1",
               },

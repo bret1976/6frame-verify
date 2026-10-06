@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { SKU_PRICES_CENTS, SKU_LABELS } from "@6frame/contracts";
+import { offeredSkuCatalog } from "@6frame/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export async function GET() {
   const card = {
     name: "6Frame Verify",
     description:
-      "Paid agent-to-agent acceptance-testing. Prove a website or creative package meets the brief before delivery.",
+      "Paid agent-to-agent website acceptance-testing. Prove a website meets the brief before delivery.",
     url: `${base}/v1`,
     provider: {
       organization: "6Frame Studio",
@@ -47,25 +47,13 @@ export async function GET() {
         examples: ["Verify https://preview.example.com against my brief"],
       },
       {
-        id: "run_creative_continuity_test",
-        name: "Run creative continuity test",
-        description:
-          "Schema accepted in V1; evaluator returns not_evaluable until Phase 3",
-        tags: ["verify", "creative", "stub"],
-      },
-      {
         id: "get_acceptance_report",
         name: "Get acceptance report",
         description: "Fetch signed terminal report and evidence descriptors",
         tags: ["verify", "report"],
       },
     ],
-    pricing: Object.fromEntries(
-      (Object.keys(SKU_PRICES_CENTS) as (keyof typeof SKU_PRICES_CENTS)[]).map((k) => [
-        k,
-        { label: SKU_LABELS[k], amount_cents: SKU_PRICES_CENTS[k], currency: "usd" },
-      ]),
-    ),
+    pricing: offeredSkuCatalog(),
     endpoints: {
       openapi: `${base}/.well-known/openapi.json`,
       mcp: `${base}/mcp`,

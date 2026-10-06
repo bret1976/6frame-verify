@@ -62,7 +62,8 @@ export function assertProductionStripe(env: Env = loadEnv()) {
   if (!env.STRIPE_SECRET_KEY) {
     throw new Error("Production requires STRIPE_SECRET_KEY");
   }
-  if (env.STRIPE_SECRET_KEY.startsWith("sk_test_")) {
+  // Standard (sk_live_) and restricted (rk_live_) live keys are both accepted.
+  if (/^(sk|rk)_test_/.test(env.STRIPE_SECRET_KEY)) {
     throw new Error("Production must not use Stripe test keys");
   }
 }

@@ -14,7 +14,7 @@ async function api(path: string, init?: RequestInit) {
     console.error("Set SIXFRAME_VERIFY_API_KEY");
     process.exit(1);
   }
-  if (key.startsWith("sk_")) {
+  if (key.startsWith("sk_") || key.startsWith("rk_")) {
     console.error("Refusing Stripe secret key. Use fv_live_ API key only.");
     process.exit(1);
   }

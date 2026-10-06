@@ -1,6 +1,6 @@
 {
   "name": "io.github.bret1976/6frame-verify",
-  "description": "Paid agent-to-agent acceptance testing API. Prove a website or creative package meets the brief before delivery. REST + MCP + A2A.",
+  "description": "Paid agent-to-agent acceptance testing API. Prove a website meets the brief before delivery. REST + MCP + A2A.",
   "version": "1.0.0",
   "repository": {
     "url": "https://github.com/bret1976/6frame-verify",

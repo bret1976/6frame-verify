@@ -2,7 +2,8 @@ import {
   QuoteRequestSchema,
   SKU_PRICES_CENTS,
   WebsiteAcceptanceInputSchema,
-  CreativeContinuityInputSchema,
+  isProfileOffered,
+  isSkuOffered,
 } from "@6frame/contracts";
 import { assertSafePublicHttpsUrl } from "@6frame/evaluators";
 import { authenticateBearer, requireScope } from "@/lib/auth";
@@ -45,6 +46,14 @@ export async function POST(req: Request) {
   }
   const data = parsed.data;
 
+  if (!isProfileOffered(data.profile.slug)) {
+    return jsonError(
+      "profile_unavailable",
+      `Profile ${data.profile.slug} is not currently offered`,
+      { status: 422 },
+    );
+  }
+
   let sku = data.sku;
   if (data.profile.slug === "website-acceptance") {
     const input = WebsiteAcceptanceInputSchema.parse(data.input);
@@ -53,9 +62,10 @@ export async function POST(req: Request) {
     if (!safe.ok) {
       return jsonError("unsafe_url", safe.message, { status: 422, details: { code: safe.code } });
     }
-  } else {
-    const input = CreativeContinuityInputSchema.parse(data.input);
-    sku = sku ?? input.sku ?? "creative_pack";
+  }
+
+  if (!isSkuOffered(sku)) {
+    return jsonError("sku_unavailable", `SKU ${sku} is not currently offered`, { status: 422 });
   }
 
   const amount = SKU_PRICES_CENTS[sku as keyof typeof SKU_PRICES_CENTS];
