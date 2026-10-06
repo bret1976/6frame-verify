@@ -1,7 +1,7 @@
 {
   "slug": "6frame-studio/6frame-verify",
   "name": "6Frame Verify",
-  "description": "Paid agent-to-agent website acceptance testing. Submit a public HTTPS URL + brief, get a signed, evidence-backed Playwright acceptance report before delivery. REST + MCP + A2A. Jobs queue only after verified Stripe payment or prepaid credit.",
+  "description": "Paid agent-to-agent website acceptance testing (Bearer fv_live_ API key; Stripe pricing: Quick Check $3, Full Acceptance $12, $100 credit pack = $110 usable). Submit a public HTTPS URL + brief, get a signed, evidence-backed Playwright acceptance report before delivery. REST + MCP + A2A. Jobs queue only after verified Stripe payment or prepaid credit.",
   "tags": [
     "verify",
     "qa",
@@ -17,22 +17,7 @@
     "url": "https://web-production-1cede.up.railway.app/mcp"
   },
   "pricing": {
-    "model": "per_call",
-    "currency": "usd",
-    "skus": {
-      "website_quick": {
-        "label": "Website Quick Check (1 URL)",
-        "amount_cents": 300
-      },
-      "website_full": {
-        "label": "Website Full Acceptance (up to 10 URLs)",
-        "amount_cents": 1200
-      },
-      "credit_pack": {
-        "label": "Prepaid Credit Pack ($110 usable)",
-        "amount_cents": 10000
-      }
-    }
+    "model": "apikey"
   },
   "homepage": "https://web-production-1cede.up.railway.app",
   "repository": "https://github.com/bret1976/6frame-verify"
