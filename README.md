@@ -4,12 +4,28 @@ Paid agent-to-agent acceptance-testing API by **6Frame Studio** (Bret Jenny).
 
 An AI agent pays 6Frame Verify to prove that its work actually meets the job before it says "done."
 
-## V1 profiles
+Live: https://web-production-1cede.up.railway.app · MCP: `https://web-production-1cede.up.railway.app/mcp` (Streamable HTTP, `Authorization: Bearer fv_live_…`)
 
-| Profile | SKUs |
-|---|---|
-| Website Acceptance `website-acceptance@1.0.0` | Quick $3 · Full $12 |
-| Creative Continuity `creative-continuity@1.0.0` | Schema + stub (`not_evaluable`) until Phase 3 |
+## Pricing (live Stripe)
+
+| SKU | What you get | Price |
+|---|---|---|
+| `website_quick` | Website Quick Check — 1 public HTTPS URL | $3 |
+| `website_full` | Website Full Acceptance — up to 10 URLs | $12 |
+| `credit_pack` | Prepaid credit pack — $110 usable on `website_quick` / `website_full` | $100 |
+
+Profile: Website Acceptance `website-acceptance@1.0.0` (Playwright, deterministic evaluator, signed report + evidence).
+
+## MCP tools
+
+`verify_get_capabilities`, `verify_quote`, `verify_create_order`, `verify_buy_credits`, `verify_get_credits`, `verify_submit_job`, `verify_get_job`, `verify_get_report`
+
+## Flow
+
+1. `POST /v1/quotes` (or `verify_quote`) with a public HTTPS URL + brief → expiring quote
+2. `POST /v1/orders` → Stripe Checkout URL (or `payment_mode: "credit"` to draw down prepaid credit)
+3. Job queues only after the verified Stripe webhook / atomic credit reservation
+4. `GET /v1/jobs/{id}/report` → signed acceptance report with evidence
 
 ## Monorepo
 
