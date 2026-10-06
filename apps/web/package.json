@@ -9,7 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "seed": "tsx src/scripts/seed.ts",
-    "create-key": "tsx src/scripts/create-key.ts"
+    "create-key": "tsx src/scripts/create-key.ts",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@6frame/config": "workspace:*",
