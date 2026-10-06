@@ -7,6 +7,8 @@ import { getStripe } from "@/lib/stripe";
 import { isStripeReady } from "@/lib/env";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
+import { withTransaction } from "@/lib/db";
+import { reserveCredits } from "@/lib/credits";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,9 @@ export async function POST(req: Request) {
   const quote = quotes[0];
   if (!quote) return jsonError("quote_not_found", "Quote not found", { status: 404 });
   if (quote.status !== "open") return jsonError("quote_not_open", "Quote is not open", { status: 409 });
+  if (quote.sku === "credit_pack") {
+    return jsonError("use_credit_checkout", "Buy credit packs via POST /v1/credits/checkout", { status: 422 });
+  }
   if (!isSkuOffered(quote.sku)) {
     return jsonError("sku_unavailable", `SKU ${quote.sku} is not currently offered`, { status: 422 });
   }
@@ -47,31 +52,40 @@ export async function POST(req: Request) {
   }
 
   if (data.payment_mode === "credit") {
-    // Atomic credit reservation
-    const { rows: bal } = await query(
-      `SELECT COALESCE(SUM(delta),0)::int AS balance FROM credit_ledgers WHERE tenant_id=$1`,
-      [auth.tenantId],
-    );
-    const balance = bal[0]?.balance ?? 0;
-    if (balance < quote.quote_amount) {
-      return jsonError("insufficient_credit", "Not enough prepaid credit", {
+    // Atomic credit drawdown: per-tenant advisory lock + ledger insert in one transaction
+    const result = await withTransaction(async (client) => {
+      const q = await client.query(`SELECT status FROM quotes WHERE id=$1 FOR UPDATE`, [quote.id]);
+      if (q.rows[0]?.status !== "open") return { kind: "quote_not_open" as const };
+      const { rows: orders } = await client.query(
+        `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, paid_at, idempotency_key)
+         VALUES ($1,$2,$3,$4,'usd','credit_reserved',now(),$5) RETURNING *`,
+        [auth.tenantId, quote.id, quote.sku, quote.quote_amount, idem],
+      );
+      const order = orders[0];
+      const reserved = await reserveCredits(client, auth.tenantId, order.id, quote.quote_amount);
+      if (!reserved) throw Object.assign(new Error("insufficient_credit"), { code: "insufficient_credit" });
+      await client.query(`UPDATE quotes SET status='accepted' WHERE id=$1`, [quote.id]);
+      return { kind: "ok" as const, order, balance_after: reserved.balance_after };
+    }).catch(async (e: Error & { code?: string }) => {
+      if (e.code === "insufficient_credit") {
+        const { rows: bal } = await query(
+          `SELECT COALESCE(SUM(delta),0)::int AS balance FROM credit_ledgers WHERE tenant_id=$1`,
+          [auth.tenantId],
+        );
+        return { kind: "insufficient" as const, balance: bal[0]?.balance ?? 0 };
+      }
+      throw e;
+    });
+    if (result.kind === "quote_not_open") {
+      return jsonError("quote_not_open", "Quote is not open", { status: 409 });
+    }
+    if (result.kind === "insufficient") {
+      return jsonError("insufficient_credit", "Not enough prepaid credit. Buy a pack via POST /v1/credits/checkout", {
         status: 402,
-        details: { balance_cents: balance, required_cents: quote.quote_amount },
+        details: { balance_cents: result.balance, required_cents: quote.quote_amount },
       });
     }
-    const { rows: orders } = await query(
-      `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, paid_at, idempotency_key)
-       VALUES ($1,$2,$3,$4,'usd','credit_reserved',now(),$5) RETURNING *`,
-      [auth.tenantId, quote.id, quote.sku, quote.quote_amount, idem],
-    );
-    const order = orders[0];
-    const newBal = balance - quote.quote_amount;
-    await query(
-      `INSERT INTO credit_ledgers (tenant_id, order_id, delta, reason, balance_after, idempotency_key)
-       VALUES ($1,$2,$3,'reserve_for_order',$4,$5)`,
-      [auth.tenantId, order.id, -quote.quote_amount, newBal, `reserve:${order.id}`],
-    );
-    await query(`UPDATE quotes SET status='accepted' WHERE id=$1`, [quote.id]);
+    const order = result.order;
     const response = {
       id: order.id,
       status: order.status,
@@ -79,6 +93,7 @@ export async function POST(req: Request) {
       currency: order.currency,
       payment_mode: "credit",
       paid_at: order.paid_at,
+      credit_balance_after_cents: result.balance_after,
     };
     await saveIdempotentResponse(auth, idem, "POST", "/v1/orders", data, 200, response);
     await audit({

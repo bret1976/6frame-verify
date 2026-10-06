@@ -37,6 +37,11 @@ export async function POST(req: Request) {
   if (cached) return jsonOk(cached.response_body, { status: cached.response_status });
 
   const body = await req.json().catch(() => null);
+  if (body && typeof body === "object" && (body as { sku?: unknown }).sku === "credit_pack") {
+    return jsonError("use_credit_checkout", "Buy credit packs via POST /v1/credits/checkout (no quote needed)", {
+      status: 422,
+    });
+  }
   const parsed = QuoteRequestSchema.safeParse(body);
   if (!parsed.success) {
     return jsonError("invalid_input", "Quote request failed validation", {

@@ -71,7 +71,7 @@ export async function GET() {
       },
       "/v1/orders": {
         post: {
-          summary: "Create paid order from quote",
+          summary: "Create order from quote (payment_mode checkout | payment_intent | credit — credit draws down prepaid balance)",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -82,6 +82,37 @@ export async function GET() {
             },
           ],
           responses: { "200": { description: "Order" }, "503": { description: "Stripe not configured" } },
+        },
+      },
+      "/v1/credits": {
+        get: {
+          summary: "Prepaid credit balance + ledger",
+          security: [{ bearerAuth: [] }],
+          responses: { "200": { description: "Balance" } },
+        },
+      },
+      "/v1/credits/checkout": {
+        post: {
+          summary: "Buy credit_pack ($100 → $110 usable). Returns Stripe Checkout URL; credits added on verified webhook",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "Idempotency-Key", in: "header", required: true, schema: { type: "string" } },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success_url: { type: "string", format: "uri" },
+                    cancel_url: { type: "string", format: "uri" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Checkout session" }, "503": { description: "Stripe not configured" } },
         },
       },
       "/v1/orders/{id}": {

@@ -4,6 +4,7 @@ import { jsonOk, jsonError } from "@/lib/http";
 import { getStripe } from "@/lib/stripe";
 import { env, isStripeReady } from "@/lib/env";
 import { audit } from "@/lib/audit";
+import { grantCreditPack, clawbackCreditPack } from "@/lib/credits";
 import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,24 @@ export async function POST(req: Request) {
     ) {
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = session.metadata?.order_id;
-      if (orderId && session.payment_status === "paid") {
+      if (orderId && session.payment_status === "paid" && session.metadata?.sku === "credit_pack") {
+        const result = await grantCreditPack({
+          orderId,
+          amountPaidCents: session.amount_total,
+          currency: session.currency,
+          paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+          checkoutSessionId: session.id,
+        });
+        await audit({
+          tenant_id: session.metadata?.tenant_id,
+          actor_type: "stripe",
+          actor_id: event.id,
+          action: `credit_pack.${result.status}`,
+          object_type: "order",
+          object_id: orderId,
+          metadata: result as unknown as Record<string, unknown>,
+        });
+      } else if (orderId && session.payment_status === "paid") {
         await query(
           `UPDATE orders SET status='paid', paid_at=now(),
              stripe_payment_intent_id=COALESCE(stripe_payment_intent_id, $2)
@@ -70,7 +88,24 @@ export async function POST(req: Request) {
     } else if (event.type === "payment_intent.succeeded") {
       const pi = event.data.object as Stripe.PaymentIntent;
       const orderId = pi.metadata?.order_id;
-      if (orderId) {
+      if (orderId && pi.metadata?.sku === "credit_pack") {
+        const result = await grantCreditPack({
+          orderId,
+          amountPaidCents: pi.amount_received,
+          currency: pi.currency,
+          paymentIntentId: pi.id,
+          checkoutSessionId: null,
+        });
+        await audit({
+          tenant_id: pi.metadata?.tenant_id,
+          actor_type: "stripe",
+          actor_id: event.id,
+          action: `credit_pack.${result.status}`,
+          object_type: "order",
+          object_id: orderId,
+          metadata: result as unknown as Record<string, unknown>,
+        });
+      } else if (orderId) {
         await query(
           `UPDATE orders SET status='paid', paid_at=now(), stripe_payment_intent_id=$2
            WHERE id=$1 AND status IN ('draft','payment_pending')`,
@@ -88,11 +123,19 @@ export async function POST(req: Request) {
     } else if (event.type === "charge.refunded" || event.type === "payment_intent.canceled") {
       const obj = event.data.object as { metadata?: { order_id?: string }; id?: string };
       const orderId = obj.metadata?.order_id;
-      if (orderId) {
+      if (orderId && (obj.metadata as { sku?: string })?.sku === "credit_pack") {
+        if (event.type === "charge.refunded") await clawbackCreditPack(orderId);
+      } else if (orderId) {
         await query(
           `UPDATE orders SET status='refunded', refunded_at=now() WHERE id=$1`,
           [orderId],
         );
+      }
+    } else if (event.type === "checkout.session.expired") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const orderId = session.metadata?.order_id;
+      if (orderId) {
+        await query(`UPDATE orders SET status='expired' WHERE id=$1 AND status='payment_pending'`, [orderId]);
       }
     }
 

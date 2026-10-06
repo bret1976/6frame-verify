@@ -34,11 +34,22 @@ export async function POST(req: Request) {
         },
         {
           name: "verify_create_order",
-          description: "Create order from quote_id",
+          description: "Create order from quote_id (payment_mode: checkout | payment_intent | credit)",
           inputSchema: {
             type: "object",
             properties: { quote_id: { type: "string" }, payment_mode: { type: "string" } },
           },
+        },
+        {
+          name: "verify_buy_credits",
+          description:
+            "Buy a $100 prepaid credit pack ($110 usable) — REST POST /v1/credits/checkout with Idempotency-Key; returns Stripe Checkout URL",
+          inputSchema: { type: "object", properties: {} },
+        },
+        {
+          name: "verify_get_credits",
+          description: "Prepaid credit balance and ledger — REST GET /v1/credits",
+          inputSchema: { type: "object", properties: {} },
         },
         {
           name: "verify_submit_job",
@@ -108,6 +119,8 @@ export async function GET() {
       "verify_get_capabilities",
       "verify_quote",
       "verify_create_order",
+      "verify_buy_credits",
+      "verify_get_credits",
       "verify_submit_job",
       "verify_get_job",
       "verify_get_report",

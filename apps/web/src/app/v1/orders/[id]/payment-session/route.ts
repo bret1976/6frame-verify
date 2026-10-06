@@ -26,6 +26,11 @@ export async function POST(
   if (order.status === "paid" || order.status === "credit_reserved") {
     return jsonOk({ id: order.id, status: order.status, already_paid: true });
   }
+  if (order.sku === "credit_pack") {
+    return jsonError("use_credit_checkout", "Start a new credit purchase via POST /v1/credits/checkout", {
+      status: 422,
+    });
+  }
   if (!isSkuOffered(order.sku)) {
     return jsonError("sku_unavailable", `SKU ${order.sku} is not currently offered`, { status: 422 });
   }

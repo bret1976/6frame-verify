@@ -47,6 +47,13 @@ export async function GET() {
         examples: ["Verify https://preview.example.com against my brief"],
       },
       {
+        id: "buy_prepaid_credits",
+        name: "Buy prepaid credits",
+        description:
+          "Buy a $100 credit pack ($110 usable) via Stripe Checkout; then pay website checks with payment_mode=credit",
+        tags: ["verify", "billing", "credits"],
+      },
+      {
         id: "get_acceptance_report",
         name: "Get acceptance report",
         description: "Fetch signed terminal report and evidence descriptors",

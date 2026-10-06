@@ -34,6 +34,16 @@ export async function GET(req: Request) {
       agent_card: "/.well-known/agent-card.json",
       mcp: "/mcp",
       base: "/v1",
+      credits: "/v1/credits",
+      credit_checkout: "/v1/credits/checkout",
+    },
+    credits: {
+      sku: "credit_pack",
+      price_cents: 10000,
+      usable_cents: 11000,
+      buy: "POST /v1/credits/checkout (Idempotency-Key) → Stripe Checkout URL; balance added on verified webhook",
+      spend: "POST /v1/orders {quote_id, payment_mode:'credit'} for website_quick / website_full quotes",
+      balance: "GET /v1/credits",
     },
     payments: {
       ...stripeStatus(),

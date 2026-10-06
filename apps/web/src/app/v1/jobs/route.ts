@@ -45,6 +45,14 @@ export async function POST(req: Request) {
   const order = orders[0];
   if (!order) return jsonError("order_not_found", "Order not found", { status: 404 });
 
+  if (order.sku === "credit_pack") {
+    return jsonError(
+      "not_a_job_order",
+      "Credit pack orders add balance; create a website quote and order with payment_mode=credit",
+      { status: 422 },
+    );
+  }
+
   // HARD RULE: refuse unpaid jobs — no mock unlock
   if (!PAID_STATUSES.has(order.status)) {
     return jsonError(
