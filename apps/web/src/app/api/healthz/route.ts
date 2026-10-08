@@ -7,6 +7,6 @@ export async function GET() {
     ok: true,
     service: "6frame-verify",
     ts: new Date().toISOString(),
-    packs: ["quote-reuse-v1"],
+    packs: ["quote-reuse-v1", "webhook-inbox-v1"],
   });
 }

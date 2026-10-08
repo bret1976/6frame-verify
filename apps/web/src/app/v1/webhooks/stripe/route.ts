@@ -5,6 +5,13 @@ import { getStripe } from "@/lib/stripe";
 import { env, isStripeReady } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { grantCreditPack, clawbackCreditPack } from "@/lib/credits";
+import {
+  claimWebhookEvent,
+  inboxEnabled,
+  markFailed,
+  markProcessed,
+  type ClaimResult,
+} from "@/lib/webhook-inbox";
 import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
@@ -31,15 +38,39 @@ export async function POST(req: Request) {
   }
 
   const payloadHash = `sha256:${createHash("sha256").update(rawBody).digest("hex")}`;
-  try {
-    await query(
-      `INSERT INTO webhook_events (provider, provider_event_id, payload_hash, processing_status)
-       VALUES ('stripe',$1,$2,'received')`,
-      [event.id, payloadHash],
-    );
-  } catch {
-    // unique violation = replay
-    return jsonOk({ received: true, duplicate: true });
+  let claim: ClaimResult | null = null;
+  if (inboxEnabled()) {
+    // webhook-inbox-v1: retry failed/stuck events; never ack a DB error as a replay.
+    claim = await claimWebhookEvent(query, {
+      provider: "stripe",
+      eventId: event.id,
+      payloadHash,
+    });
+    if (claim.kind === "duplicate") return jsonOk({ received: true, duplicate: true });
+    if (claim.kind === "parked") return jsonOk({ received: true, duplicate: true });
+    if (claim.kind === "in_flight") {
+      return jsonError("event_in_progress", "Event is being processed; retry later", {
+        status: 409,
+        retryable: true,
+      });
+    }
+    if (claim.kind === "db_unavailable") {
+      return jsonError("storage_unavailable", "Webhook could not be recorded; retry later", {
+        status: 503,
+        retryable: true,
+      });
+    }
+  } else {
+    try {
+      await query(
+        `INSERT INTO webhook_events (provider, provider_event_id, payload_hash, processing_status)
+         VALUES ('stripe',$1,$2,'received')`,
+        [event.id, payloadHash],
+      );
+    } catch {
+      // unique violation = replay
+      return jsonOk({ received: true, duplicate: true });
+    }
   }
 
   try {
@@ -139,15 +170,23 @@ export async function POST(req: Request) {
       }
     }
 
-    await query(
-      `UPDATE webhook_events SET processed_at=now(), processing_status='processed' WHERE provider='stripe' AND provider_event_id=$1`,
-      [event.id],
-    );
+    if (claim) {
+      await markProcessed(query, { provider: "stripe", eventId: event.id, claim });
+    } else {
+      await query(
+        `UPDATE webhook_events SET processed_at=now(), processing_status='processed' WHERE provider='stripe' AND provider_event_id=$1`,
+        [event.id],
+      );
+    }
   } catch (e) {
-    await query(
-      `UPDATE webhook_events SET processing_status='failed' WHERE provider='stripe' AND provider_event_id=$1`,
-      [event.id],
-    );
+    if (claim) {
+      await markFailed(query, { provider: "stripe", eventId: event.id, claim, error: e });
+    } else {
+      await query(
+        `UPDATE webhook_events SET processing_status='failed' WHERE provider='stripe' AND provider_event_id=$1`,
+        [event.id],
+      );
+    }
     return jsonError("processing_failed", e instanceof Error ? e.message : "failed", {
       status: 500,
       retryable: true,
