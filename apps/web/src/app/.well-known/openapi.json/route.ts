@@ -12,7 +12,7 @@ export async function GET() {
       title: "6Frame Verify API",
       version: "1.0.0",
       description:
-        "Paid agent-to-agent website acceptance-testing API. Jobs queue only after verified Stripe payment or credit reservation. Offered SKUs: website_quick ($3), website_full ($12), credit_pack ($100).",
+        "Pre-launch website QA API (real Chromium, desktop + mobile). Free key with 1 Quick Check/day via POST /v1/keys. One-call checks via POST /v1/checks (free → credit → 402 with Stripe checkout_url). SKUs: website_quick ($3), website_full ($12), credit_pack_9 ($9 → $10), credit_pack_29 ($29 → $35).",
       contact: { name: "6Frame Studio", url: "https://6framestudio.com" },
     },
     servers: [{ url: base }],
@@ -84,6 +84,50 @@ export async function GET() {
           responses: { "200": { description: "Order" }, "503": { description: "Stripe not configured" } },
         },
       },
+      "/v1/keys": {
+        post: {
+          summary: "Self-serve API key from an email (shown once). Keyless. Rate limited per IP/email. Includes 1 free Quick Check/day.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["email"], properties: { email: { type: "string", format: "email" } } } } },
+          },
+          responses: { "201": { description: "Key created" }, "429": { description: "Rate limited" } },
+        },
+      },
+      "/v1/checks": {
+        post: {
+          summary: "Run a website check in one call: today's free Quick Check, else prepaid credit, else 402 with Stripe checkout_url (job auto-runs after payment)",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: "Idempotency-Key", in: "header", required: false, schema: { type: "string" } }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["url"],
+                  properties: {
+                    url: { type: "string", format: "uri" },
+                    sku: { type: "string", enum: ["website_quick", "website_full"], default: "website_quick" },
+                    paths: { type: "array", items: { type: "string" }, maxItems: 10 },
+                    brief: { type: "string" },
+                    required_terms: { type: "array", items: { type: "string" } },
+                    required_ctas: { type: "array", items: { type: "string" } },
+                    forbidden_terms: { type: "array", items: { type: "string" } },
+                    pay_with: { type: "string", enum: ["auto", "free", "credit", "checkout"], default: "auto" },
+                    callback: { type: "object", properties: { url: { type: "string" }, secret: { type: "string" } } },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Queued: job_id, report_page, poll URLs" },
+            "402": { description: "Payment required: checkout_url" },
+            "429": { description: "Rate limited" },
+          },
+        },
+      },
       "/v1/credits": {
         get: {
           summary: "Prepaid credit balance + ledger",
@@ -93,7 +137,7 @@ export async function GET() {
       },
       "/v1/credits/checkout": {
         post: {
-          summary: "Buy credit_pack ($100 → $110 usable). Returns Stripe Checkout URL; credits added on verified webhook",
+          summary: "Buy a credit pack: credit_pack_9 ($9 → $10) or credit_pack_29 ($29 → $35). Returns Stripe Checkout URL; credits added on verified webhook",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "Idempotency-Key", in: "header", required: true, schema: { type: "string" } },
@@ -105,6 +149,7 @@ export async function GET() {
                 schema: {
                   type: "object",
                   properties: {
+                    pack: { type: "string", enum: ["credit_pack_9", "credit_pack_29"], default: "credit_pack_9" },
                     success_url: { type: "string", format: "uri" },
                     cancel_url: { type: "string", format: "uri" },
                   },

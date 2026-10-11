@@ -24,6 +24,10 @@ export const EnvSchema = z.object({
   STRIPE_PRICE_CREATIVE_PACK: z.preprocess(emptyToUndefined, z.string().optional()),
   STRIPE_PRICE_CREATIVE_SEQUENCE: z.preprocess(emptyToUndefined, z.string().optional()),
   STRIPE_PRICE_CREDIT_PACK: z.preprocess(emptyToUndefined, z.string().optional()),
+  STRIPE_PRICE_CREDIT_PACK_9: z.preprocess(emptyToUndefined, z.string().optional()),
+  STRIPE_PRICE_CREDIT_PACK_29: z.preprocess(emptyToUndefined, z.string().optional()),
+  /** Salt for hashing client IPs / emails in rate-limit rows (falls back to API_ENCRYPTION_KEY). */
+  RATE_LIMIT_SALT: z.preprocess(emptyToUndefined, z.string().optional()),
   REPORT_SIGNING_PRIVATE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   API_ENCRYPTION_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   SENTRY_DSN: z.preprocess(emptyToUndefined, z.string().optional()),

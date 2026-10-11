@@ -1,11 +1,28 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 
+const base = (process.env.APP_BASE_URL || "https://web-production-1cede.up.railway.app").replace(/\/$/, "");
+const title = "6Frame Verify — Pre-launch website QA in 60 seconds";
+const description =
+  "Paste your URL: a real browser checks broken links, SEO tags, social previews, mobile layout, console errors and load time on desktop + mobile. Report with screenshots. $3 per check.";
+
 export const metadata: Metadata = {
-  title: "6Frame Verify — Agent acceptance testing",
-  description:
-    "An AI agent pays 6Frame Verify to prove that its work actually meets the job before it says done.",
+  metadataBase: new URL(base),
+  title,
+  description,
+  applicationName: "6Frame Verify",
+  openGraph: {
+    type: "website",
+    url: base,
+    siteName: "6Frame Verify",
+    title,
+    description,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "6Frame Verify — pre-launch website QA in 60 seconds" }],
+  },
+  twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
 };
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#07080b" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

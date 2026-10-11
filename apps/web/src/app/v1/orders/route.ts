@@ -1,7 +1,7 @@
 import { OrderRequestSchema, isSkuOffered } from "@6frame/contracts";
 import { authenticateBearer, requireScope } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { jsonOk, jsonError } from "@/lib/http";
+import { jsonOk, jsonError, unauthorized } from "@/lib/http";
 import { loadIdempotentResponse, saveIdempotentResponse } from "@/lib/idempotency";
 import { getStripe } from "@/lib/stripe";
 import { isStripeReady } from "@/lib/env";
@@ -9,12 +9,16 @@ import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { withTransaction } from "@/lib/db";
 import { reserveCredits } from "@/lib/credits";
+import { lineItemFor } from "@/lib/prices";
+import { publicToken } from "@/lib/fulfil";
+import { orderPageUrl } from "@/lib/links";
+import type { PricingSku } from "@6frame/contracts";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const auth = await authenticateBearer(req.headers.get("authorization"));
-  if (!auth) return jsonError("unauthorized", "Bearer fv_live_ API key required", { status: 401 });
+  if (!auth) return unauthorized();
   if (!requireScope(auth, "billing:write") && !requireScope(auth, "verify:write")) {
     return jsonError("forbidden", "Missing billing scope", { status: 403 });
   }
@@ -40,7 +44,7 @@ export async function POST(req: Request) {
   const quote = quotes[0];
   if (!quote) return jsonError("quote_not_found", "Quote not found", { status: 404 });
   if (quote.status !== "open") return jsonError("quote_not_open", "Quote is not open", { status: 409 });
-  if (quote.sku === "credit_pack") {
+  if (String(quote.sku).startsWith("credit_pack")) {
     return jsonError("use_credit_checkout", "Buy credit packs via POST /v1/credits/checkout", { status: 422 });
   }
   if (!isSkuOffered(quote.sku)) {
@@ -51,15 +55,16 @@ export async function POST(req: Request) {
     return jsonError("quote_expired", "Quote expired", { status: 409 });
   }
 
+  let insufficient: { balance_cents: number; required_cents: number } | null = null;
   if (data.payment_mode === "credit") {
     // Atomic credit drawdown: per-tenant advisory lock + ledger insert in one transaction
     const result = await withTransaction(async (client) => {
       const q = await client.query(`SELECT status FROM quotes WHERE id=$1 FOR UPDATE`, [quote.id]);
       if (q.rows[0]?.status !== "open") return { kind: "quote_not_open" as const };
       const { rows: orders } = await client.query(
-        `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, paid_at, idempotency_key)
-         VALUES ($1,$2,$3,$4,'usd','credit_reserved',now(),$5) RETURNING *`,
-        [auth.tenantId, quote.id, quote.sku, quote.quote_amount, idem],
+        `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, paid_at, idempotency_key, public_token, payment_source)
+         VALUES ($1,$2,$3,$4,'usd','credit_reserved',now(),$5,$6,'credit') RETURNING *`,
+        [auth.tenantId, quote.id, quote.sku, quote.quote_amount, idem, publicToken()],
       );
       const order = orders[0];
       const reserved = await reserveCredits(client, auth.tenantId, order.id, quote.quote_amount);
@@ -80,31 +85,31 @@ export async function POST(req: Request) {
       return jsonError("quote_not_open", "Quote is not open", { status: 409 });
     }
     if (result.kind === "insufficient") {
-      return jsonError("insufficient_credit", "Not enough prepaid credit. Buy a pack via POST /v1/credits/checkout", {
-        status: 402,
-        details: { balance_cents: result.balance, required_cents: quote.quote_amount },
+      // Paid call without credit → fall through and hand back a Stripe Checkout link for this
+      // quote; the job then runs automatically once Stripe confirms payment.
+      insufficient = { balance_cents: result.balance, required_cents: quote.quote_amount };
+    } else {
+      const order = result.order;
+      const response = {
+        id: order.id,
+        status: order.status,
+        amount_cents: order.amount,
+        currency: order.currency,
+        payment_mode: "credit",
+        paid_at: order.paid_at,
+        credit_balance_after_cents: result.balance_after,
+      };
+      await saveIdempotentResponse(auth, idem, "POST", "/v1/orders", data, 200, response);
+      await audit({
+        tenant_id: auth.tenantId,
+        actor_type: "api_client",
+        actor_id: auth.clientId,
+        action: "order.credit_reserved",
+        object_type: "order",
+        object_id: order.id,
       });
+      return jsonOk(response);
     }
-    const order = result.order;
-    const response = {
-      id: order.id,
-      status: order.status,
-      amount_cents: order.amount,
-      currency: order.currency,
-      payment_mode: "credit",
-      paid_at: order.paid_at,
-      credit_balance_after_cents: result.balance_after,
-    };
-    await saveIdempotentResponse(auth, idem, "POST", "/v1/orders", data, 200, response);
-    await audit({
-      tenant_id: auth.tenantId,
-      actor_type: "api_client",
-      actor_id: auth.clientId,
-      action: "order.credit_reserved",
-      object_type: "order",
-      object_id: order.id,
-    });
-    return jsonOk(response);
   }
 
   // Stripe Checkout / PaymentIntent — real Stripe only; refuse if not configured
@@ -119,13 +124,13 @@ export async function POST(req: Request) {
   const base = env().APP_BASE_URL;
 
   const { rows: orders } = await query(
-    `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, idempotency_key)
-     VALUES ($1,$2,$3,$4,'usd','payment_pending',$5) RETURNING *`,
-    [auth.tenantId, quote.id, quote.sku, quote.quote_amount, idem],
+    `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, idempotency_key, public_token, payment_source, auto_job)
+     VALUES ($1,$2,$3,$4,'usd','payment_pending',$5,$6,'stripe',$7) RETURNING *`,
+    [auth.tenantId, quote.id, quote.sku, quote.quote_amount, idem, publicToken(), Boolean(insufficient)],
   );
   const order = orders[0];
 
-  if (data.payment_mode === "payment_intent") {
+  if (data.payment_mode === "payment_intent" && !insufficient) {
     const pi = await stripe.paymentIntents.create(
       {
         amount: quote.quote_amount,
@@ -153,31 +158,17 @@ export async function POST(req: Request) {
     return jsonOk(response);
   }
 
-  // default: checkout
+  // default: checkout (also used when payment_mode=credit had insufficient balance)
+  const { lineItem } = await lineItemFor(stripe, quote.sku as PricingSku);
+  const meta = { order_id: order.id, tenant_id: auth.tenantId, sku: quote.sku, app: "6frame-verify" };
   const session = await stripe.checkout.sessions.create(
     {
       mode: "payment",
-      success_url:
-        data.success_url ||
-        `${base}/status?order=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: data.success_url || `${orderPageUrl(order.public_token)}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: data.cancel_url || `${base}/pricing?cancelled=1`,
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "usd",
-            unit_amount: quote.quote_amount,
-            product_data: {
-              name: `6Frame Verify — ${quote.sku}`,
-              metadata: { order_id: order.id },
-            },
-          },
-        },
-      ],
-      metadata: { order_id: order.id, tenant_id: auth.tenantId, sku: quote.sku },
-      payment_intent_data: {
-        metadata: { order_id: order.id, tenant_id: auth.tenantId },
-      },
+      line_items: [lineItem],
+      metadata: meta,
+      payment_intent_data: { metadata: meta },
     },
     { idempotencyKey: `cs_${order.id}` },
   );
@@ -194,9 +185,14 @@ export async function POST(req: Request) {
     payment_mode: "checkout",
     checkout_url: session.url,
     checkout_session_id: session.id,
-    note: "Browser redirect is NOT payment proof. Wait for webhook-driven status=paid before submitting a job.",
+    order_page: orderPageUrl(order.public_token),
+    note: insufficient
+      ? "Not enough prepaid credit — pay at checkout_url and the job runs automatically after Stripe confirms payment."
+      : "Browser redirect is NOT payment proof. Wait for webhook-driven status=paid before submitting a job.",
+    ...(insufficient ? { error: { code: "insufficient_credit", ...insufficient } } : {}),
   };
-  await saveIdempotentResponse(auth, idem, "POST", "/v1/orders", data, 200, response);
+  const status = insufficient ? 402 : 200;
+  await saveIdempotentResponse(auth, idem, "POST", "/v1/orders", data, status, response);
   await audit({
     tenant_id: auth.tenantId,
     actor_type: "api_client",
@@ -205,5 +201,5 @@ export async function POST(req: Request) {
     object_type: "order",
     object_id: order.id,
   });
-  return jsonOk(response);
+  return jsonOk(response, { status });
 }

@@ -1,6 +1,6 @@
 import { authenticateBearer } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { jsonOk, jsonError } from "@/lib/http";
+import { jsonOk, jsonError, unauthorized } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const auth = await authenticateBearer(req.headers.get("authorization"));
-  if (!auth) return jsonError("unauthorized", "Bearer API key required", { status: 401 });
+  if (!auth) return unauthorized("Bearer API key required");
   const { id } = await ctx.params;
   const { rows } = await query(
     `SELECT j.*, p.slug AS profile_slug, pv.version AS profile_version

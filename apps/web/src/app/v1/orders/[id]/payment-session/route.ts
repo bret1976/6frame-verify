@@ -1,7 +1,8 @@
+import { isCreditPackSku } from "@6frame/contracts";
 import { isSkuOffered } from "@6frame/contracts";
 import { authenticateBearer } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { jsonOk, jsonError } from "@/lib/http";
+import { jsonOk, jsonError, unauthorized } from "@/lib/http";
 import { getStripe } from "@/lib/stripe";
 import { isStripeReady, env } from "@/lib/env";
 
@@ -12,7 +13,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const auth = await authenticateBearer(req.headers.get("authorization"));
-  if (!auth) return jsonError("unauthorized", "Bearer API key required", { status: 401 });
+  if (!auth) return unauthorized("Bearer API key required");
   if (!isStripeReady()) {
     return jsonError("stripe_not_configured", "Stripe not configured", { status: 503 });
   }
@@ -26,7 +27,7 @@ export async function POST(
   if (order.status === "paid" || order.status === "credit_reserved") {
     return jsonOk({ id: order.id, status: order.status, already_paid: true });
   }
-  if (order.sku === "credit_pack") {
+  if (isCreditPackSku(order.sku)) {
     return jsonError("use_credit_checkout", "Start a new credit purchase via POST /v1/credits/checkout", {
       status: 422,
     });

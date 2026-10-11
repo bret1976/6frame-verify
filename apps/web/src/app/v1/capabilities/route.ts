@@ -1,4 +1,5 @@
-import { DISABLED_SKUS, isProfileOffered, offeredSkuCatalog } from "@6frame/contracts";
+import { CREDIT_PACKS, FREE_QUICK_CHECKS_PER_DAY, SOLD_CREDIT_PACKS, isProfileOffered, offeredSkuCatalog } from "@6frame/contracts";
+import { priceSources } from "@/lib/prices";
 import { authenticateBearer } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { jsonOk, jsonError } from "@/lib/http";
@@ -34,19 +35,22 @@ export async function GET(req: Request) {
       agent_card: "/.well-known/agent-card.json",
       mcp: "/mcp",
       base: "/v1",
+      signup: "/v1/keys",
+      signup_page: "/get-key",
+      checks: "/v1/checks",
       credits: "/v1/credits",
       credit_checkout: "/v1/credits/checkout",
     },
+    free_tier: { quick_checks_per_day_per_key: FREE_QUICK_CHECKS_PER_DAY, signup: "POST /v1/keys {email}" },
     credits: {
-      sku: "credit_pack",
-      price_cents: 10000,
-      usable_cents: 11000,
-      buy: "POST /v1/credits/checkout (Idempotency-Key) → Stripe Checkout URL; balance added on verified webhook",
-      spend: "POST /v1/orders {quote_id, payment_mode:'credit'} for website_quick / website_full quotes",
+      packs: SOLD_CREDIT_PACKS.map((sku) => ({ sku, ...CREDIT_PACKS[sku] })),
+      buy: 'POST /v1/credits/checkout {"pack":"credit_pack_9"} (Idempotency-Key) → Stripe Checkout URL; balance added on verified webhook',
+      spend: "POST /v1/checks {url} draws credit automatically; or POST /v1/orders payment_mode=credit",
       balance: "GET /v1/credits",
     },
     payments: {
       ...stripeStatus(),
+      price_sources: priceSources(),
       note: "Jobs queue only after verified Stripe webhook payment or atomic credit reservation. Unpaid jobs are refused.",
     },
     skus: offeredSkuCatalog(),

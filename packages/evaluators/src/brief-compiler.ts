@@ -97,6 +97,19 @@ export function compileWebsiteBrief(input: WebsiteAcceptanceInput): CompiledRequ
     normalized_rule: { kind: "no_h_overflow" },
   });
 
+  const extra: Array<[string, string, CompiledRequirement["severity"], string]> = [
+    ["links-ok", "No broken links on the page", "medium", "links_ok"],
+    ["mobile-viewport-meta", "Mobile viewport meta tag present", "medium", "viewport_meta"],
+    ["social-og-tags", "Open Graph title + image for link previews", "low", "og_tags"],
+    ["img-alt", "Images have alt text", "low", "img_alt"],
+    ["favicon", "Site has a favicon", "low", "favicon"],
+    ["console-errors", "No JavaScript console errors on load", "low", "console_errors"],
+    ["load-time", "Page becomes usable quickly (DOM ready under 4s)", "low", "load_time"],
+  ];
+  for (const [key, text, severity, kind] of extra) {
+    reqs.push({ external_key: key, text, type: "deterministic", severity, normalized_rule: { kind } });
+  }
+
   // Free-text brief lines that look like requirements but aren't structured
   // become not_evaluable rather than guessed passes.
   const lines = input.brief

@@ -169,6 +169,25 @@ async function main() {
     }
   }
 
+  // Public sample reports: SAMPLE_JOB_IDS="<job uuid>,<job uuid>,…" marks exactly these reports as
+  // samples (shown on / and /samples). Unset → leave flags unchanged.
+  const sampleIds = process.env.SAMPLE_JOB_IDS?.split(",").map((s) => s.trim()).filter((s) => /^[0-9a-f-]{36}$/i.test(s));
+  if (sampleIds && sampleIds.length) {
+    try {
+      await pool.query(`UPDATE reports SET is_sample = (job_id = ANY($1::uuid[]))`, [sampleIds]);
+      for (const id of sampleIds) {
+        await pool.query(
+          `UPDATE jobs SET public_token = COALESCE(public_token, encode(gen_random_bytes(18), 'base64')) WHERE id=$1`,
+          [id],
+        );
+        await pool.query(`UPDATE jobs SET public_token = translate(public_token, '+/=', '-_') WHERE id=$1`, [id]);
+      }
+      console.log("sample reports set", { count: sampleIds.length });
+    } catch (e) {
+      console.error("sample marking failed", e);
+    }
+  }
+
   console.log("seed complete", { website: waId, creative: ccId });
   await pool.end();
 }

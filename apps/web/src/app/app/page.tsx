@@ -17,17 +17,29 @@ async function requireAdmin() {
 
 export default async function AdminPage() {
   const ok = await requireAdmin();
+  if (!ok) {
+    return (
+      <div className="wrap">
+        <Nav />
+        <h1>Admin</h1>
+        <div className="card">
+          <h3>Auth required</h3>
+          <p>This page requires the operator token.</p>
+        </div>
+      </div>
+    );
+  }
   const stripe = stripeStatus();
   let stats = { orders: 0, jobs: 0, paid: 0, revenue: 0 };
   let recent: Array<Record<string, unknown>> = [];
   let dbOk = false;
   try {
     const o = await query<{ c: string; revenue: string }>(
-      `SELECT COUNT(*)::text AS c, COALESCE(SUM(amount) FILTER (WHERE status IN ('paid','consumed','credit_reserved')),0)::text AS revenue FROM orders`,
+      `SELECT COUNT(*)::text AS c, COALESCE(SUM(amount) FILTER (WHERE status IN ('paid','consumed','credited') AND stripe_checkout_session_id IS NOT NULL AND COALESCE(payment_source,'stripe')='stripe'),0)::text AS revenue FROM orders`,
     );
     const j = await query<{ c: string }>(`SELECT COUNT(*)::text AS c FROM jobs`);
     const p = await query<{ c: string }>(
-      `SELECT COUNT(*)::text AS c FROM orders WHERE status IN ('paid','consumed','credit_reserved')`,
+      `SELECT COUNT(*)::text AS c FROM orders WHERE status IN ('paid','consumed','credited') AND stripe_checkout_session_id IS NOT NULL AND COALESCE(payment_source,'stripe')='stripe'`,
     );
     stats = {
       orders: Number(o.rows[0]?.c ?? 0),
@@ -76,7 +88,7 @@ export default async function AdminPage() {
           </p>
         </div>
         <div className="card">
-          <h3>Gross (tracked)</h3>
+          <h3>Stripe gross (excl. credit spend, free, internal test)</h3>
           <div className="price">${stats.revenue.toFixed(2)}</div>
           <p>
             {stats.paid} paid · {stats.jobs} jobs · {stats.orders} orders

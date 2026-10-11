@@ -1,13 +1,14 @@
 import type pg from "pg";
-import { CREDIT_PACK_USABLE_CENTS, SKU_PRICES_CENTS } from "@6frame/contracts";
+import { CREDIT_PACKS, isCreditPackSku } from "@6frame/contracts";
 import { query, withTransaction } from "./db";
 
 /**
  * Prepaid credits — append-only Postgres ledger (credit_ledgers).
  * Balance = SUM(delta). Every mutation takes a per-tenant transaction-scoped advisory
  * lock so concurrent reservations cannot overdraw and balance_after stays exact.
- * Credits are ONLY granted from a signature-verified Stripe webhook for a paid
- * credit_pack order whose amount matches the live price. No manual / fake grants.
+ * Customer credits are ONLY granted from a signature-verified Stripe webhook for a paid
+ * credit pack order whose amount matches the live price. The only other grant path is the
+ * operator-only scripts/grant-test-credit.ts (reason 'internal_test_grant', never revenue).
  */
 
 type Db = pg.PoolClient;
@@ -57,7 +58,7 @@ export type GrantResult =
 
 /**
  * Called only from the verified Stripe webhook. Marks the credit_pack order paid and
- * credits CREDIT_PACK_USABLE_CENTS to the tenant exactly once.
+ * credits the pack's usable amount (CREDIT_PACKS[sku].usable_cents) to the tenant exactly once.
  */
 export async function grantCreditPack(args: {
   orderId: string;
@@ -70,7 +71,8 @@ export async function grantCreditPack(args: {
     const { rows } = await client.query(`SELECT * FROM orders WHERE id=$1 FOR UPDATE`, [args.orderId]);
     const order = rows[0];
     if (!order) return { status: "rejected", reason: "order_not_found" };
-    if (order.sku !== "credit_pack") return { status: "rejected", reason: "not_credit_pack" };
+    if (!isCreditPackSku(order.sku)) return { status: "rejected", reason: "not_credit_pack" };
+    const pack = CREDIT_PACKS[order.sku as keyof typeof CREDIT_PACKS];
     if (order.status === "credited") return { status: "already_granted" };
     if (!["draft", "payment_pending", "paid"].includes(order.status)) {
       return { status: "rejected", reason: `order_status_${order.status}` };
@@ -82,7 +84,7 @@ export async function grantCreditPack(args: {
     ) {
       return { status: "rejected", reason: "checkout_session_mismatch" };
     }
-    const expected = SKU_PRICES_CENTS.credit_pack;
+    const expected = pack.price_cents;
     if ((args.currency ?? "").toLowerCase() !== "usd" || (args.amountPaidCents ?? 0) < expected) {
       return { status: "rejected", reason: "amount_mismatch" };
     }
@@ -97,11 +99,11 @@ export async function grantCreditPack(args: {
       return { status: "already_granted" };
     }
     const balance = await balanceOf(client, order.tenant_id);
-    const after = balance + CREDIT_PACK_USABLE_CENTS;
+    const after = balance + pack.usable_cents;
     await client.query(
       `INSERT INTO credit_ledgers (tenant_id, order_id, delta, reason, balance_after, idempotency_key)
        VALUES ($1,$2,$3,'credit_pack_purchase',$4,$5)`,
-      [order.tenant_id, order.id, CREDIT_PACK_USABLE_CENTS, after, `grant:${order.id}`],
+      [order.tenant_id, order.id, pack.usable_cents, after, `grant:${order.id}`],
     );
     await client.query(
       `UPDATE orders SET status='credited', paid_at=COALESCE(paid_at, now()),
@@ -109,7 +111,7 @@ export async function grantCreditPack(args: {
        WHERE id=$1`,
       [order.id, args.paymentIntentId],
     );
-    return { status: "granted", credited_cents: CREDIT_PACK_USABLE_CENTS, balance_after: after };
+    return { status: "granted", credited_cents: pack.usable_cents, balance_after: after };
   });
 }
 
@@ -118,7 +120,7 @@ export async function clawbackCreditPack(orderId: string): Promise<boolean> {
   return withTransaction(async (client) => {
     const { rows } = await client.query(`SELECT * FROM orders WHERE id=$1 FOR UPDATE`, [orderId]);
     const order = rows[0];
-    if (!order || order.sku !== "credit_pack") return false;
+    if (!order || !isCreditPackSku(order.sku)) return false;
     await lockTenantCredits(client, order.tenant_id);
     const granted = await client.query(
       `SELECT delta FROM credit_ledgers WHERE order_id=$1 AND reason='credit_pack_purchase'`,

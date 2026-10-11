@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { API_VERSION } from "@6frame/config";
 import { requestId } from "./crypto";
+import { signupUrl, SIGNUP_HINT } from "./links";
 
 export function jsonOk<T>(body: T, init?: { status?: number; requestId?: string }) {
   const rid = init?.requestId ?? requestId();
@@ -44,4 +45,13 @@ export function jsonError(
       },
     },
   );
+}
+
+/** 401 that tells the caller exactly how to get a key. */
+export function unauthorized(message = "Bearer fv_live_ API key required") {
+  const url = signupUrl();
+  return jsonError("unauthorized", `${message}. ${SIGNUP_HINT} Sign up: ${url}`, {
+    status: 401,
+    details: { signup_url: url, signup_api: "POST /v1/keys", mcp_signup_tool: "verify_signup" },
+  });
 }
