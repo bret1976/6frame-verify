@@ -120,6 +120,55 @@ async function main() {
     }
   }
 
+
+  // Operator-only internal test credit (NOT revenue), applied once at boot.
+  // INTERNAL_TEST_GRANT="<fv_live_ key prefix>:<cents 1..5000>:<tag>" — idempotent per tag.
+  const grant = process.env.INTERNAL_TEST_GRANT?.trim();
+  if (grant) {
+    const [prefix, centsRaw, tag] = grant.split(":");
+    const cents = Number(centsRaw);
+    if (prefix?.startsWith("fv_live_") && Number.isInteger(cents) && cents > 0 && cents <= 5000 && tag) {
+      const c = await pool.query(`SELECT tenant_id FROM api_clients WHERE key_prefix=$1 AND revoked_at IS NULL LIMIT 1`, [prefix]);
+      const tenantId = c.rows[0]?.tenant_id;
+      if (tenantId) {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query(`SELECT pg_advisory_xact_lock(hashtext('credits:' || $1::text))`, [tenantId]);
+          const idem = `internal_test_grant:${tag}`;
+          const dup = await client.query(`SELECT 1 FROM credit_ledgers WHERE tenant_id=$1 AND idempotency_key=$2`, [tenantId, idem]);
+          if (!dup.rows[0]) {
+            const bal = await client.query(`SELECT COALESCE(SUM(delta),0)::int AS b FROM credit_ledgers WHERE tenant_id=$1`, [tenantId]);
+            const after = Number(bal.rows[0].b) + cents;
+            await client.query(
+              `INSERT INTO credit_ledgers (tenant_id, order_id, delta, reason, balance_after, idempotency_key)
+               VALUES ($1,NULL,$2,'internal_test_grant',$3,$4)`,
+              [tenantId, cents, after, idem],
+            );
+            await client.query(
+              `INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, object_type, metadata)
+               VALUES ($1,'operator','boot_internal_grant','credit.internal_test_grant','tenant',$2)`,
+              [tenantId, JSON.stringify({ cents, tag, prefix })],
+            );
+            console.log("internal test credit granted", { prefix, cents, tag, balance_after: after });
+          } else {
+            console.log("internal test credit already applied", { prefix, tag });
+          }
+          await client.query("COMMIT");
+        } catch (e) {
+          await client.query("ROLLBACK");
+          console.error("internal test grant failed", e);
+        } finally {
+          client.release();
+        }
+      } else {
+        console.warn("internal test grant: key prefix not found", prefix);
+      }
+    } else {
+      console.warn("internal test grant: malformed INTERNAL_TEST_GRANT");
+    }
+  }
+
   console.log("seed complete", { website: waId, creative: ccId });
   await pool.end();
 }
