@@ -1,0 +1,30 @@
+name: Publish to MCP Registry
+
+# Publishes server.json to registry.modelcontextprotocol.io (io.github.bret1976/*) using
+# GitHub Actions OIDC — no secrets. Downstream directories (PulseMCP, GitHub MCP Registry,
+# MCP Harbor, …) ingest from the official registry. Bump "version" in server.json first.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [server.json]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar -xz mcp-publisher
+          ./mcp-publisher --help | head -3
+      - name: Validate
+        run: ./mcp-publisher validate server.json
+      - name: Login (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+      - name: Publish
+        run: ./mcp-publisher publish server.json

@@ -8,10 +8,11 @@
 - MCP: https://web-production-1cede.up.railway.app/mcp
 - Repo: https://github.com/bret1976/6frame-verify
 
-## Pricing
-- `website_quick` Website Quick Check (1 URL) — $3
-- `website_full` Website Full Acceptance (up to 10 URLs) — $12
-- `credit_pack` Prepaid credit pack — $100 → $110 usable
+## Pricing (v1.1, 2026-10-11)
+- Free API key — 1 Quick Check per day (`POST /v1/keys`, `/get-key`, MCP `verify_signup`)
+- `website_quick` Quick Check (1 page, desktop + mobile) — $3 (homepage buy box, no account)
+- `website_full` Full Check (up to 10 pages) — $12
+- `credit_pack_9` $9 → $10 usable · `credit_pack_29` $29 → $35 usable ($100 pack retired)
 
 ## Directory status (2026-10-06)
 | Directory | Status |
@@ -24,10 +25,9 @@
 | AgentMarketplace (ArisPay CLI) | Pack ready (`docs/marketplace/agent.json`); needs `agentmarketplace login <ARISPAY_API_KEY>` then `publish --force` |
 
 ## Republish (official registry)
-```bash
-mcp-publisher login github
-mcp-publisher publish docs/marketplace/server.json   # bump "version" for every update
-```
+Copy `docs/marketplace/publish-mcp-registry.workflow.yml` to `.github/workflows/` once (this needs a token with `workflow` scope).
+After that, bumping `version` in `server.json` on main publishes via GitHub OIDC with no secrets.
+Submission details for the other directories: `docs/marketplace/SUBMISSIONS.md`.
 
 ## AgentMarketplace / ArisPay
 ```bash
@@ -36,4 +36,4 @@ cd docs/marketplace && agentmarketplace publish ./agent.json --force
 ```
 
 ## Copy
-**6Frame Verify** — zero-touch quality gate for delivery agents. Pay per run via Stripe, submit a public HTTPS URL + brief, get a signed evidence-backed acceptance report. No fake unlocks.
+**6Frame Verify** — pre-launch website QA in 60 seconds. A real Chromium browser checks a live URL on desktop + mobile (broken links, SEO tags, Open Graph, mobile overflow, console errors, load time) and returns a shareable report with screenshots and fixes. Free key with 1 check/day; $3 per Quick Check. MCP + REST.

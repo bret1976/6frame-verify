@@ -15,7 +15,9 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z
   .object({
-    pack: z.enum(SOLD_CREDIT_PACKS).default("credit_pack_9"),
+    pack: z.enum(SOLD_CREDIT_PACKS).optional(),
+    /** Alias for `pack` (agents often send `sku`). */
+    sku: z.enum(SOLD_CREDIT_PACKS).optional(),
     success_url: z.string().url().optional(),
     cancel_url: z.string().url().optional(),
   })
@@ -53,8 +55,8 @@ export async function POST(req: Request) {
       details: parsed.error.flatten(),
     });
   }
-  const data = parsed.data ?? { pack: "credit_pack_9" as SoldCreditPack };
-  const pack = (data.pack ?? "credit_pack_9") as SoldCreditPack;
+  const data = parsed.data ?? {};
+  const pack = (data.pack ?? data.sku ?? "credit_pack_9") as SoldCreditPack;
 
   if (!isStripeReady()) {
     return jsonError("stripe_not_configured", "Stripe is not configured. No credits without payment.", {
