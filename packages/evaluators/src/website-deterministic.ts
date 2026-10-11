@@ -208,7 +208,9 @@ export function evaluateDeterministic(
           confidence: 0.95,
           reason:
             broken.length === 0
-              ? `${capture.linksChecked ?? 0} links checked, none broken`
+              ? (capture.linksChecked ?? 0) === 0
+                ? "No https links found on the page to check"
+                : `${capture.linksChecked} links checked, none broken`
               : `${broken.length} broken link(s): ${broken.slice(0, 5).map((b) => `${b.url} (${b.status || "no response"})`).join(", ")}`,
           repair: broken.length === 0 ? undefined : "Fix or remove the broken links listed",
           evidence_ids: [],

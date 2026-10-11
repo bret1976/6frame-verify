@@ -58,24 +58,47 @@ test("tools/list without a key → 200 with all tools", async () => {
   );
 });
 
-for (const name of MCP_TOOLS.map((t) => t.name)) {
-  test(`tools/call ${name} without a key → same 401 as before`, async () => {
+const KEYLESS = new Set(["verify_get_capabilities", "verify_signup", "verify_quote"]);
+
+test("verify_get_capabilities works without a key", async () => {
+  const res = await POST(rpc("tools/call", { name: "verify_get_capabilities", arguments: {} }, 3));
+  assert.equal(res.status, 200);
+  const j = await res.json();
+  assert.notEqual(j.result.isError, true);
+  const caps = JSON.parse(j.result.content[0].text);
+  assert.ok(caps.signup.url.endsWith("/get-key"));
+  assert.equal(caps.skus.website_quick.amount_cents, 300);
+  assert.equal(caps.skus.credit_pack_9.amount_cents, 900);
+  assert.equal(caps.skus.credit_pack_29.amount_cents, 2900);
+});
+
+test("verify_signup without email → tool error (no key needed, no DB hit)", async () => {
+  const res = await POST(rpc("tools/call", { name: "verify_signup", arguments: {} }, 3));
+  assert.equal(res.status, 200);
+  const j = await res.json();
+  assert.equal(j.result.isError, true);
+});
+
+for (const name of MCP_TOOLS.map((t) => t.name).filter((n) => !KEYLESS.has(n))) {
+  test(`tools/call ${name} without a key → tool error pointing to signup`, async () => {
     const res = await POST(rpc("tools/call", { name, arguments: {} }, 3));
-    assert.equal(res.status, 401);
+    assert.equal(res.status, 200);
     const j = await res.json();
-    assert.equal(j.error.code, "unauthorized");
-    assert.equal(j.error.message, "MCP requires Bearer fv_live_ API key");
+    assert.equal(j.result.isError, true);
+    assert.match(j.result.content[0].text, /get-key/);
+    assert.match(j.result.content[0].text, /verify_signup/);
   });
 }
 
-test("tools/call with a malformed key → 401", async () => {
+test("tools/call with a malformed key → tool error with signup link", async () => {
   const req = new Request(URL_, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer not_a_key" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "verify_create_order" } }),
+    body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "verify_check_site" } }),
   });
   const res = await POST(req);
-  assert.equal(res.status, 401);
+  const j = await res.json();
+  assert.equal(j.result.isError, true);
 });
 
 test("unknown method / empty body without a key → 401", async () => {

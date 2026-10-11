@@ -32,7 +32,7 @@ export default async function HomePage() {
             breaks launches: broken links, missing titles and social previews, mobile overflow, console
             errors, slow loads. You get a shareable report with screenshots and exact fixes.
           </p>
-          <ul className="checks">
+          <ul className="checks desktoponly">
             <li>HTTP status &amp; HTTPS</li>
             <li>Broken links</li>
             <li>Title, meta description, H1</li>
@@ -45,6 +45,16 @@ export default async function HomePage() {
         </div>
         <BuyBox priceLabel="$3" />
       </div>
+      <ul className="checks mobileonly">
+        <li>HTTP status &amp; HTTPS</li>
+        <li>Broken links</li>
+        <li>Title, meta description, H1</li>
+        <li>Social preview (Open Graph)</li>
+        <li>Mobile viewport &amp; overflow</li>
+        <li>Console errors &amp; load time</li>
+        <li>Image alt text &amp; favicon</li>
+        <li>Desktop + mobile screenshots</li>
+      </ul>
 
       <h2>Sample reports</h2>
       {samples.length ? (

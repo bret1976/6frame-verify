@@ -7,14 +7,19 @@ export function subjectHash(value: string): string {
   return crypto.createHmac("sha256", salt).update(value.trim().toLowerCase()).digest("hex").slice(0, 32);
 }
 
-/** Best-effort client IP behind Railway's proxy. */
+/**
+ * Best-effort client IP behind Railway's proxy. Prefer X-Real-IP (set by the edge); otherwise the
+ * LAST X-Forwarded-For hop (appended by our proxy) — the first hop is client-controlled and spoofable.
+ */
 export function clientIp(req: Request): string {
+  const real = req.headers.get("x-real-ip")?.trim();
+  if (real) return real;
   const xff = req.headers.get("x-forwarded-for");
   if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = xff.split(",").map((h) => h.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1]!;
   }
-  return req.headers.get("x-real-ip")?.trim() || "unknown";
+  return "unknown";
 }
 
 export type Window = { seconds: number; max: number };

@@ -1,7 +1,6 @@
-import { env } from "./env";
-
 export function baseUrl(): string {
-  return env().APP_BASE_URL.replace(/\/$/, "");
+  // Read directly (not via env()) so pure modules/tests work without DATABASE_URL.
+  return (process.env.APP_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 }
 export function signupUrl(): string {
   return `${baseUrl()}/get-key`;

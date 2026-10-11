@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Nav, Footer } from "@/components/Nav";
 import { env } from "@/lib/env";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "API & MCP docs — 6Frame Verify",
   description: "Run website QA checks from scripts and AI agents: REST POST /v1/checks or the MCP server at /mcp.",

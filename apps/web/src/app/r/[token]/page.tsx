@@ -25,7 +25,7 @@ const CHECK_NAMES: Record<string, string> = {
 
 function checkName(key: string, reqText?: string) {
   if (CHECK_NAMES[key]) return CHECK_NAMES[key];
-  if (key.startsWith("path-")) return reqText ?? "Page responds";
+  if (key.startsWith("path-")) return (reqText ?? "Page responds").replace(/^Required path (\S+) must return HTTP 2xx$/, "Page $1 responds");
   return reqText ?? key;
 }
 
