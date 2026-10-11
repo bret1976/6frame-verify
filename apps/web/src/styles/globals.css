@@ -124,3 +124,6 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: upp
 }
 .mobileonly { display: none; }
 @media (max-width: 860px) { .desktoponly { display: none; } .mobileonly { display: grid; } }
+
+/* long tokens (console errors, URLs) must wrap on mobile */
+.fixes li, .card p, .tablewrap td { overflow-wrap: anywhere; }

@@ -1,31 +1,45 @@
-# 6Frame Verify
+# 6Frame Verify — pre-launch website QA in 60 seconds
 
-Paid agent-to-agent acceptance-testing API by **6Frame Studio** (Bret Jenny).
+Paste a URL; a real Chromium browser loads it on desktop and mobile and checks what breaks launches: HTTP status, broken links, title / meta description / H1, Open Graph social previews, mobile viewport + horizontal overflow, console errors, load time, image alt text, favicon. You get a shareable report with screenshots and exact fixes. Works for humans (web, $3) and AI agents (MCP / REST).
 
-An AI agent pays 6Frame Verify to prove that its work actually meets the job before it says "done."
-
-Live: https://web-production-1cede.up.railway.app · MCP: `https://web-production-1cede.up.railway.app/mcp` (Streamable HTTP, `Authorization: Bearer fv_live_…`)
+- **Check a site ($3, no account):** https://web-production-1cede.up.railway.app
+- **Sample reports:** https://web-production-1cede.up.railway.app/samples
+- **Free API key (1 free Quick Check/day):** https://web-production-1cede.up.railway.app/get-key
+- **MCP (Streamable HTTP):** `https://web-production-1cede.up.railway.app/mcp`
 
 ## Pricing (live Stripe)
 
-| SKU | What you get | Price |
-|---|---|---|
-| `website_quick` | Website Quick Check — 1 public HTTPS URL | $3 |
-| `website_full` | Website Full Acceptance — up to 10 URLs | $12 |
-| `credit_pack` | Prepaid credit pack — $110 usable on `website_quick` / `website_full` | $100 |
+| What | Price |
+|---|---|
+| Free API key | 1 Quick Check per day |
+| Quick Check — 1 page, desktop + mobile | $3 |
+| Full Check — up to 10 pages | $12 |
+| Starter credits | $9 → $10 usable |
+| Pro credits | $29 → $35 usable |
 
-Profile: Website Acceptance `website-acceptance@1.0.0` (Playwright, deterministic evaluator, signed report + evidence).
+## Use from an agent (MCP)
 
-## MCP tools
+```json
+{
+  "mcpServers": {
+    "6frame-verify": {
+      "url": "https://web-production-1cede.up.railway.app/mcp",
+      "headers": { "Authorization": "Bearer fv_live_..." }
+    }
+  }
+}
+```
 
-`verify_get_capabilities`, `verify_quote`, `verify_create_order`, `verify_buy_credits`, `verify_get_credits`, `verify_submit_job`, `verify_get_job`, `verify_get_report`
+No key yet? `verify_signup` (keyless) creates one from an email. Keyless tools: `verify_get_capabilities`, `verify_quote`, `verify_signup`. With a key: `verify_check_site` (free daily check → credit → Stripe checkout link for a human), `verify_get_job`, `verify_get_report`, `verify_get_credits`, `verify_buy_credits`.
 
-## Flow
+## Use from a script (REST)
 
-1. `POST /v1/quotes` (or `verify_quote`) with a public HTTPS URL + brief → expiring quote
-2. `POST /v1/orders` → Stripe Checkout URL (or `payment_mode: "credit"` to draw down prepaid credit)
-3. Job queues only after the verified Stripe webhook / atomic credit reservation
-4. `GET /v1/jobs/{id}/report` → signed acceptance report with evidence
+```bash
+curl -X POST https://web-production-1cede.up.railway.app/v1/keys -H 'content-type: application/json' -d '{"email":"you@example.com"}'
+curl -X POST https://web-production-1cede.up.railway.app/v1/checks -H "Authorization: Bearer $KEY" -H 'content-type: application/json' -d '{"url":"https://your-site.com"}'
+```
+
+`/v1/checks` uses today's free Quick Check, else prepaid credit, else returns `402` with a Stripe `checkout_url`; the check runs automatically once paid. Full spec: `/.well-known/openapi.json`. Advanced quote → order → job flow is unchanged.
 
 ## Monorepo
 
