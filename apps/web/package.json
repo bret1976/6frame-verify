@@ -10,7 +10,8 @@
     "db:migrate": "tsx src/scripts/migrate.ts",
     "seed": "tsx src/scripts/seed.ts",
     "create-key": "tsx src/scripts/create-key.ts",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "node --import tsx --test test/*.test.ts",
+    "grant-test-credit": "tsx src/scripts/grant-test-credit.ts"
   },
   "dependencies": {
     "@6frame/config": "workspace:*",

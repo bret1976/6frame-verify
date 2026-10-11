@@ -62,10 +62,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // One job per paid order (consumed after queue)
-  const { rows: existing } = await query(`SELECT id, status FROM jobs WHERE order_id=$1`, [
-    order.id,
-  ]);
+  // One job per paid order (consumed after queue). A job that died on a platform error
+  // (order restored to 'paid' by the worker) does not block a retry.
+  const { rows: existing } = await query(
+    `SELECT id, status FROM jobs WHERE order_id=$1 AND status <> 'failed_platform' ORDER BY created_at DESC`,
+    [order.id],
+  );
   if (existing[0]) {
     const response = { id: existing[0].id, status: existing[0].status, reused: true };
     await saveIdempotentResponse(auth, idem, "POST", "/v1/jobs", data, 200, response);

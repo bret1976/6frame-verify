@@ -90,16 +90,15 @@ export async function processJob(jobId: string) {
 
     // Persist evidence rows
     const evidenceIds: string[] = [];
-    for (const uri of capture.evidencePaths) {
-      const buf = Buffer.from(uri); // hash of uri path marker; file already stored
+    for (const ev0 of capture.evidence) {
       const { rows: ev } = await query(
         `INSERT INTO evidence_items (job_id, type, uri, content_hash, capture_metadata)
          VALUES ($1,'screenshot',$2,$3,$4) RETURNING id`,
         [
           jobId,
-          uri,
-          sha256(uri),
-          JSON.stringify({ finalUrl: capture.finalUrl, status: capture.status }),
+          ev0.uri,
+          ev0.content_hash,
+          JSON.stringify({ name: ev0.name, finalUrl: capture.finalUrl, status: capture.status }),
         ],
       );
       if (ev[0]) evidenceIds.push(ev[0].id);
@@ -203,7 +202,7 @@ async function finalize(
   report.integrity.signature = signReport(reportJson);
   const finalJson = JSON.stringify(report);
 
-  await storeEvidence(jobId, "report.json", Buffer.from(finalJson));
+  await storeEvidence(jobId, "report.json", Buffer.from(finalJson), { persistToDb: false });
 
   await query(
     `INSERT INTO reports (job_id, report_version, status, score, release_decision, artifact_json, signature, input_hash, report_hash)

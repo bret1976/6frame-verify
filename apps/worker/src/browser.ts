@@ -26,7 +26,7 @@ async function getBrowser() {
 export async function captureWebsite(
   jobId: string,
   input: WebsiteAcceptanceInput,
-): Promise<PageCapture & { evidencePaths: string[] }> {
+): Promise<PageCapture & { evidence: { uri: string; content_hash: string; name: string }[] }> {
   const safe = await assertSafePublicHttpsUrl(input.target_url);
   if (!safe.ok) {
     throw Object.assign(new Error(safe.message), { code: safe.code });
@@ -45,7 +45,7 @@ export async function captureWebsite(
     if (msg.type() === "error") consoleErrors.push(msg.text());
   });
 
-  const evidencePaths: string[] = [];
+  const evidence: { uri: string; content_hash: string; name: string }[] = [];
   const pathStatuses: Record<string, number> = {};
 
   const base = new URL(input.target_url);
@@ -105,9 +105,14 @@ export async function captureWebsite(
       return el.scrollWidth > el.clientWidth + 2;
     });
     if (hasOverflow) overflowX = true;
-    const shot = await page.screenshot({ fullPage: true, type: "png" });
-    const stored = await storeEvidence(jobId, `viewport-${vp.name}.png`, shot);
-    evidencePaths.push(stored.uri);
+    // JPEG keeps full-page captures small enough to persist in Postgres for report pages.
+    let shot = await page.screenshot({ fullPage: true, type: "jpeg", quality: 60 });
+    if (shot.length > 3_500_000) {
+      shot = await page.screenshot({ fullPage: false, type: "jpeg", quality: 60 });
+    }
+    const name = `viewport-${vp.name}.jpg`;
+    const stored = await storeEvidence(jobId, name, shot);
+    evidence.push({ uri: stored.uri, content_hash: stored.content_hash, name });
   }
 
   await context.close();
@@ -124,7 +129,7 @@ export async function captureWebsite(
     consoleErrors,
     overflowX,
     pathStatuses,
-    evidencePaths,
+    evidence,
   };
 }
 
