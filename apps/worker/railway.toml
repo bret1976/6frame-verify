@@ -1,6 +1,10 @@
+# Mirrors the Railway worker service settings (service config is the source of truth).
+# Chromium + OS deps MUST be installed at build time; without them every job fails with
+# "Executable doesn't exist". PLAYWRIGHT_BROWSERS_PATH=/app/.ms-playwright is set on the
+# worker service so the browser lands inside /app and survives into the runtime image.
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd ../.. && corepack enable && pnpm install && pnpm --filter @6frame/config build && pnpm --filter @6frame/contracts build && pnpm --filter @6frame/evaluators build && pnpm --filter @6frame/worker build && cd apps/worker && npx playwright install chromium --with-deps || true"
+buildCommand = "pnpm install && pnpm --filter @6frame/config build && pnpm --filter @6frame/contracts build && pnpm --filter @6frame/evaluators build && pnpm --filter @6frame/worker build && cd apps/worker && npx playwright install --with-deps chromium"
 watchPatterns = ["apps/worker/**", "packages/**"]
 
 [deploy]
