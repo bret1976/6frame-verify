@@ -14,7 +14,28 @@ export type PageCapture = {
   overflowX: boolean;
   screenshotPath?: string;
   pathStatuses: Record<string, number>;
+  /** Optional extended signals (worker >= 1.1). Missing → rule reports not_evaluable. */
+  loadMs?: number;
+  linksChecked?: number;
+  brokenLinks?: { url: string; status: number }[];
+  imagesTotal?: number;
+  imagesMissingAlt?: number;
+  ogTitle?: string | null;
+  ogImage?: string | null;
+  hasViewportMeta?: boolean;
+  hasFavicon?: boolean;
 };
+
+function notEval(req: CompiledRequirement, why: string): Finding {
+  return {
+    requirement_id: req.external_key,
+    verdict: "not_evaluable",
+    severity: "info",
+    confidence: 1,
+    reason: why,
+    evidence_ids: [],
+  };
+}
 
 export function evaluateDeterministic(
   requirements: CompiledRequirement[],
@@ -177,6 +198,104 @@ export function evaluateDeterministic(
         });
         break;
       }
+      case "links_ok": {
+        if (capture.brokenLinks === undefined) { findings.push(notEval(req, "Link check not captured")); break; }
+        const broken = capture.brokenLinks;
+        findings.push({
+          requirement_id: req.external_key,
+          verdict: broken.length === 0 ? "pass" : "fail",
+          severity: req.severity,
+          confidence: 0.95,
+          reason:
+            broken.length === 0
+              ? `${capture.linksChecked ?? 0} links checked, none broken`
+              : `${broken.length} broken link(s): ${broken.slice(0, 5).map((b) => `${b.url} (${b.status || "no response"})`).join(", ")}`,
+          repair: broken.length === 0 ? undefined : "Fix or remove the broken links listed",
+          evidence_ids: [],
+        });
+        break;
+      }
+      case "img_alt": {
+        if (capture.imagesMissingAlt === undefined) { findings.push(notEval(req, "Image scan not captured")); break; }
+        const n = capture.imagesMissingAlt;
+        findings.push({
+          requirement_id: req.external_key,
+          verdict: n === 0 ? "pass" : "warning",
+          severity: req.severity,
+          confidence: 1,
+          reason: n === 0 ? `All ${capture.imagesTotal ?? 0} images have alt attributes` : `${n} of ${capture.imagesTotal ?? n} images have no alt attribute`,
+          repair: n === 0 ? undefined : "Add descriptive alt text (or alt=\"\" for decorative images)",
+          evidence_ids: [],
+        });
+        break;
+      }
+      case "og_tags": {
+        if (capture.ogTitle === undefined) { findings.push(notEval(req, "Social tags not captured")); break; }
+        const ok = Boolean(capture.ogTitle) && Boolean(capture.ogImage);
+        findings.push({
+          requirement_id: req.external_key,
+          verdict: ok ? "pass" : "warning",
+          severity: req.severity,
+          confidence: 1,
+          reason: ok ? "og:title and og:image present" : `Missing ${[!capture.ogTitle && "og:title", !capture.ogImage && "og:image"].filter(Boolean).join(" and ")} — links shared on social/chat get a bare preview`,
+          repair: ok ? undefined : "Add <meta property=\"og:title\"> and <meta property=\"og:image\">",
+          evidence_ids: [],
+        });
+        break;
+      }
+      case "viewport_meta": {
+        if (capture.hasViewportMeta === undefined) { findings.push(notEval(req, "Viewport meta not captured")); break; }
+        findings.push({
+          requirement_id: req.external_key,
+          verdict: capture.hasViewportMeta ? "pass" : "fail",
+          severity: req.severity,
+          confidence: 1,
+          reason: capture.hasViewportMeta ? "Mobile viewport meta tag present" : "No <meta name=\"viewport\"> — page will render zoomed-out on phones",
+          repair: capture.hasViewportMeta ? undefined : "Add <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+          evidence_ids: [],
+        });
+        break;
+      }
+      case "favicon": {
+        if (capture.hasFavicon === undefined) { findings.push(notEval(req, "Favicon not captured")); break; }
+        findings.push({
+          requirement_id: req.external_key,
+          verdict: capture.hasFavicon ? "pass" : "warning",
+          severity: req.severity,
+          confidence: 0.9,
+          reason: capture.hasFavicon ? "Favicon found" : "No favicon found (link rel=icon or /favicon.ico)",
+          repair: capture.hasFavicon ? undefined : "Add a favicon",
+          evidence_ids: [],
+        });
+        break;
+      }
+      case "console_errors": {
+        const n = capture.consoleErrors.length;
+        findings.push({
+          requirement_id: req.external_key,
+          verdict: n === 0 ? "pass" : "warning",
+          severity: n > 5 ? "medium" : req.severity,
+          confidence: 1,
+          reason: n === 0 ? "No JavaScript console errors on load" : `${n} console error(s), e.g. ${capture.consoleErrors[0]?.slice(0, 160)}`,
+          repair: n === 0 ? undefined : "Open DevTools → Console and fix the errors listed",
+          evidence_ids: [],
+        });
+        break;
+      }
+      case "load_time": {
+        if (capture.loadMs === undefined) { findings.push(notEval(req, "Load time not captured")); break; }
+        const s2 = capture.loadMs / 1000;
+        findings.push({
+          requirement_id: req.external_key,
+          verdict: s2 <= 4 ? "pass" : "warning",
+          severity: req.severity,
+          confidence: 0.8,
+          reason: `Page loaded (DOM ready) in ${s2.toFixed(1)}s from our test region`,
+          repair: s2 <= 4 ? undefined : "Reduce page weight / blocking scripts; aim for under 4s",
+          evidence_ids: [],
+        });
+        break;
+      }
       default:
         findings.push({
           requirement_id: req.external_key,
@@ -189,7 +308,7 @@ export function evaluateDeterministic(
     }
   }
 
-  if (capture.consoleErrors.length > 5) {
+  if (capture.consoleErrors.length > 5 && !requirements.some((r) => r.normalized_rule.kind === "console_errors")) {
     findings.push({
       requirement_id: "console-errors",
       verdict: "warning",

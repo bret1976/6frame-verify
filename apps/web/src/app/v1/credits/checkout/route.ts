@@ -1,8 +1,11 @@
 import { z } from "zod";
-import { CREDIT_PACK_USABLE_CENTS, SKU_LABELS, SKU_PRICES_CENTS } from "@6frame/contracts";
+import { CREDIT_PACKS, SKU_PRICES_CENTS, SOLD_CREDIT_PACKS, type SoldCreditPack } from "@6frame/contracts";
+import { lineItemFor } from "@/lib/prices";
+import { publicToken } from "@/lib/fulfil";
+import { orderPageUrl } from "@/lib/links";
 import { authenticateBearer, requireScope } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { jsonOk, jsonError } from "@/lib/http";
+import { jsonOk, jsonError, unauthorized } from "@/lib/http";
 import { loadIdempotentResponse, saveIdempotentResponse } from "@/lib/idempotency";
 import { getStripe } from "@/lib/stripe";
 import { env, isStripeReady } from "@/lib/env";
@@ -12,19 +15,20 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z
   .object({
+    pack: z.enum(SOLD_CREDIT_PACKS).default("credit_pack_9"),
     success_url: z.string().url().optional(),
     cancel_url: z.string().url().optional(),
   })
   .default({});
 
 /**
- * POST /v1/credits/checkout — buy a prepaid credit pack ($100 → $110 usable).
- * Creates a live Stripe Checkout Session for STRIPE_PRICE_CREDIT_PACK. Credits are added
+ * POST /v1/credits/checkout {pack?: credit_pack_9 | credit_pack_29} — $9 → $10 or $29 → $35 usable.
+ * Creates a live Stripe Checkout Session on a reusable price. Credits are added
  * ONLY when the signed checkout.session.completed webhook confirms payment.
  */
 export async function POST(req: Request) {
   const auth = await authenticateBearer(req.headers.get("authorization"));
-  if (!auth) return jsonError("unauthorized", "Bearer fv_live_ API key required", { status: 401 });
+  if (!auth) return unauthorized("Bearer fv_live_ API key required");
   if (!requireScope(auth, "billing:write") && !requireScope(auth, "verify:write")) {
     return jsonError("forbidden", "Missing billing scope", { status: 403 });
   }
@@ -49,7 +53,8 @@ export async function POST(req: Request) {
       details: parsed.error.flatten(),
     });
   }
-  const data = parsed.data;
+  const data = parsed.data ?? { pack: "credit_pack_9" as SoldCreditPack };
+  const pack = (data.pack ?? "credit_pack_9") as SoldCreditPack;
 
   if (!isStripeReady()) {
     return jsonError("stripe_not_configured", "Stripe is not configured. No credits without payment.", {
@@ -60,33 +65,25 @@ export async function POST(req: Request) {
   const stripe = getStripe()!;
   const e = env();
   const base = e.APP_BASE_URL;
-  const amount = SKU_PRICES_CENTS.credit_pack;
+  const amount = SKU_PRICES_CENTS[pack];
+  const token = publicToken();
 
   const { rows: orders } = await query(
-    `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, idempotency_key)
-     VALUES ($1,NULL,'credit_pack',$2,'usd','payment_pending',$3) RETURNING *`,
-    [auth.tenantId, amount, `credit_checkout:${idem}`],
+    `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, idempotency_key, public_token, payment_source)
+     VALUES ($1,NULL,$2,$3,'usd','payment_pending',$4,$5,'stripe') RETURNING *`,
+    [auth.tenantId, pack, amount, `credit_checkout:${idem}`, token],
   );
   const order = orders[0];
-  const metadata = { order_id: order.id, tenant_id: auth.tenantId, sku: "credit_pack" };
+  const metadata = { order_id: order.id, tenant_id: auth.tenantId, sku: pack, app: "6frame-verify" };
 
-  const lineItem = e.STRIPE_PRICE_CREDIT_PACK
-    ? { price: e.STRIPE_PRICE_CREDIT_PACK, quantity: 1 }
-    : {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: amount,
-          product_data: { name: `6Frame Verify — ${SKU_LABELS.credit_pack}` },
-        },
-      };
+  const { lineItem } = await lineItemFor(stripe, pack);
 
   let session;
   try {
     session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
-        success_url: data.success_url || `${base}/status?order=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
+        success_url: data.success_url || `${orderPageUrl(token)}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: data.cancel_url || `${base}/pricing?cancelled=1`,
         line_items: [lineItem],
         metadata,
@@ -116,12 +113,13 @@ export async function POST(req: Request) {
   await query(`UPDATE orders SET stripe_checkout_session_id=$1 WHERE id=$2`, [session.id, order.id]);
   const response = {
     id: order.id,
-    sku: "credit_pack",
+    sku: pack,
     status: "payment_pending",
     amount_cents: amount,
     stripe_amount_total: session.amount_total,
     currency: "usd",
-    credits_on_payment_cents: CREDIT_PACK_USABLE_CENTS,
+    credits_on_payment_cents: CREDIT_PACKS[pack].usable_cents,
+    order_page: orderPageUrl(token),
     checkout_url: session.url,
     checkout_session_id: session.id,
     note: "Credits are added only after Stripe's signed checkout.session.completed webhook. Check GET /v1/credits.",
@@ -131,7 +129,7 @@ export async function POST(req: Request) {
     tenant_id: auth.tenantId,
     actor_type: "api_client",
     actor_id: auth.clientId,
-    action: "credit_pack.payment_pending",
+    action: `${pack}.payment_pending`,
     object_type: "order",
     object_id: order.id,
   });

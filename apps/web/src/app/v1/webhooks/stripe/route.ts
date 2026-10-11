@@ -5,6 +5,8 @@ import { getStripe } from "@/lib/stripe";
 import { env, isStripeReady } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { grantCreditPack, clawbackCreditPack } from "@/lib/credits";
+import { onOrderPaid } from "@/lib/fulfil";
+import { isCreditPackSku } from "@6frame/contracts";
 import {
   claimWebhookEvent,
   inboxEnabled,
@@ -80,7 +82,7 @@ export async function POST(req: Request) {
     ) {
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = session.metadata?.order_id;
-      if (orderId && session.payment_status === "paid" && session.metadata?.sku === "credit_pack") {
+      if (orderId && session.payment_status === "paid" && isCreditPackSku(session.metadata?.sku)) {
         const result = await grantCreditPack({
           orderId,
           amountPaidCents: session.amount_total,
@@ -98,28 +100,37 @@ export async function POST(req: Request) {
           metadata: result as unknown as Record<string, unknown>,
         });
       } else if (orderId && session.payment_status === "paid") {
-        await query(
-          `UPDATE orders SET status='paid', paid_at=now(),
-             stripe_payment_intent_id=COALESCE(stripe_payment_intent_id, $2)
-           WHERE id=$1 AND status IN ('draft','payment_pending')`,
-          [
+        const { rows: ord } = await query(`SELECT amount FROM orders WHERE id=$1`, [orderId]);
+        if (ord[0] && (session.amount_total ?? 0) >= Number(ord[0].amount) && (session.currency ?? "usd") === "usd") {
+          await onOrderPaid(
             orderId,
             typeof session.payment_intent === "string" ? session.payment_intent : null,
-          ],
-        );
-        await audit({
-          tenant_id: session.metadata?.tenant_id,
-          actor_type: "stripe",
-          actor_id: event.id,
-          action: "order.paid",
-          object_type: "order",
-          object_id: orderId,
-        });
+            `stripe:${event.id}`,
+          );
+          await audit({
+            tenant_id: session.metadata?.tenant_id,
+            actor_type: "stripe",
+            actor_id: event.id,
+            action: "order.paid",
+            object_type: "order",
+            object_id: orderId,
+          });
+        } else if (ord[0]) {
+          await audit({
+            tenant_id: session.metadata?.tenant_id,
+            actor_type: "stripe",
+            actor_id: event.id,
+            action: "order.amount_mismatch",
+            object_type: "order",
+            object_id: orderId,
+            metadata: { amount_total: session.amount_total, expected: ord[0].amount },
+          });
+        }
       }
     } else if (event.type === "payment_intent.succeeded") {
       const pi = event.data.object as Stripe.PaymentIntent;
       const orderId = pi.metadata?.order_id;
-      if (orderId && pi.metadata?.sku === "credit_pack") {
+      if (orderId && isCreditPackSku(pi.metadata?.sku)) {
         const result = await grantCreditPack({
           orderId,
           amountPaidCents: pi.amount_received,
@@ -137,24 +148,23 @@ export async function POST(req: Request) {
           metadata: result as unknown as Record<string, unknown>,
         });
       } else if (orderId) {
-        await query(
-          `UPDATE orders SET status='paid', paid_at=now(), stripe_payment_intent_id=$2
-           WHERE id=$1 AND status IN ('draft','payment_pending')`,
-          [orderId, pi.id],
-        );
-        await audit({
-          tenant_id: pi.metadata?.tenant_id,
-          actor_type: "stripe",
-          actor_id: event.id,
-          action: "order.paid",
-          object_type: "order",
-          object_id: orderId,
-        });
+        const { rows: ord } = await query(`SELECT amount FROM orders WHERE id=$1`, [orderId]);
+        if (ord[0] && (pi.amount_received ?? 0) >= Number(ord[0].amount)) {
+          await onOrderPaid(orderId, pi.id, `stripe:${event.id}`);
+          await audit({
+            tenant_id: pi.metadata?.tenant_id,
+            actor_type: "stripe",
+            actor_id: event.id,
+            action: "order.paid",
+            object_type: "order",
+            object_id: orderId,
+          });
+        }
       }
     } else if (event.type === "charge.refunded" || event.type === "payment_intent.canceled") {
       const obj = event.data.object as { metadata?: { order_id?: string }; id?: string };
       const orderId = obj.metadata?.order_id;
-      if (orderId && (obj.metadata as { sku?: string })?.sku === "credit_pack") {
+      if (orderId && isCreditPackSku((obj.metadata as { sku?: string })?.sku)) {
         if (event.type === "charge.refunded") await clawbackCreditPack(orderId);
       } else if (orderId) {
         await query(

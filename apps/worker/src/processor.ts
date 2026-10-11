@@ -22,7 +22,7 @@ async function step(
 ) {
   await query(
     `INSERT INTO job_steps (job_id, step_name, status, started_at, finished_at, worker_version, error_code)
-     VALUES ($1,$2,$3,now(),now(),'worker@1.0.0',$4)`,
+     VALUES ($1,$2,$3,now(),now(),'worker@1.1.0',$4)`,
     [jobId, name, status, extra?.error_code ?? null],
   );
 }

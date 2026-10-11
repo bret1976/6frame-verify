@@ -1,3 +1,4 @@
+import { isCreditPackSku } from "@6frame/contracts";
 import {
   JobCreateRequestSchema,
   WebsiteAcceptanceInputSchema,
@@ -8,7 +9,7 @@ import { assertSafePublicHttpsUrl, compileWebsiteBrief } from "@6frame/evaluator
 import { authenticateBearer, requireScope } from "@/lib/auth";
 import { query, withTransaction } from "@/lib/db";
 import { sha256 } from "@/lib/crypto";
-import { jsonOk, jsonError } from "@/lib/http";
+import { jsonOk, jsonError, unauthorized } from "@/lib/http";
 import { loadIdempotentResponse, saveIdempotentResponse } from "@/lib/idempotency";
 import { enqueueVerifyJob } from "@/lib/queue";
 import { audit } from "@/lib/audit";
@@ -19,7 +20,7 @@ const PAID_STATUSES = new Set(["paid", "credit_reserved"]);
 
 export async function POST(req: Request) {
   const auth = await authenticateBearer(req.headers.get("authorization"));
-  if (!auth) return jsonError("unauthorized", "Bearer API key required", { status: 401 });
+  if (!auth) return unauthorized("Bearer API key required");
   if (!requireScope(auth, "verify:write")) {
     return jsonError("forbidden", "Missing verify:write", { status: 403 });
   }
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
   const order = orders[0];
   if (!order) return jsonError("order_not_found", "Order not found", { status: 404 });
 
-  if (order.sku === "credit_pack") {
+  if (isCreditPackSku(order.sku)) {
     return jsonError(
       "not_a_job_order",
       "Credit pack orders add balance; create a website quote and order with payment_mode=credit",

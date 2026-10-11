@@ -7,7 +7,7 @@ const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 
 console.log("[worker] 6Frame Verify starting", {
   redis: redisUrl.replace(/:[^:@]+@/, ":***@"),
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 const worker = new Worker(

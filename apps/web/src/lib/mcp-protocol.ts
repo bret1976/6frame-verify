@@ -6,7 +6,7 @@
  * Everything else — notably every tools/call — still requires a Bearer fv_live_ key.
  */
 
-export const MCP_SERVER_INFO = { name: "6frame-verify", title: "6Frame Verify", version: "1.0.0" } as const;
+export const MCP_SERVER_INFO = { name: "6frame-verify", title: "6Frame Verify", version: "1.1.0" } as const;
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] as const;
 export const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
@@ -23,53 +23,77 @@ export function isPublicMcpMethod(method: unknown): boolean {
   return typeof method === "string" && PUBLIC_MCP_METHODS.has(method);
 }
 
+/** Tools callable WITHOUT an API key (free, no tenant data). */
+export const KEYLESS_TOOLS: ReadonlySet<string> = new Set(["verify_get_capabilities", "verify_signup", "verify_quote"]);
+
+const URL_PROP = { type: "string", description: "Public https:// URL of the site to check" };
+
 export const MCP_TOOLS = [
   {
     name: "verify_get_capabilities",
-    description: "Profiles, price/rate limits (website_quick $3, website_full $12, credit_pack $100)",
+    description:
+      "Free, no key. What 6Frame Verify checks, prices (Quick $3, Full $12, credit packs $9→$10 and $29→$35), free tier (1 Quick Check/day per key) and how to sign up.",
     inputSchema: { type: "object", properties: {} },
   },
   {
-    name: "verify_quote",
-    description: "Create website-acceptance quote — use REST POST /v1/quotes with same payload",
-    inputSchema: { type: "object", properties: { profile: {}, input: {} } },
-  },
-  {
-    name: "verify_create_order",
-    description: "Create order from quote_id (payment_mode: checkout | payment_intent | credit)",
+    name: "verify_signup",
+    description:
+      "Free, no key. Create an API key from an email address (shown once). Includes 1 free Quick Check per day. Rate limited.",
     inputSchema: {
       type: "object",
-      properties: { quote_id: { type: "string" }, payment_mode: { type: "string" } },
+      properties: { email: { type: "string", description: "Email of the human who owns this key" } },
+      required: ["email"],
     },
   },
   {
-    name: "verify_buy_credits",
-    description:
-      "Buy a $100 prepaid credit pack ($110 usable) — REST POST /v1/credits/checkout with Idempotency-Key; returns Stripe Checkout URL",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "verify_get_credits",
-    description: "Prepaid credit balance and ledger — REST GET /v1/credits",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "verify_submit_job",
-    description: "Submit job for paid order",
+    name: "verify_quote",
+    description: "Free, no key. Price for checking a URL (website_quick = 1 page, website_full = up to 10 pages).",
     inputSchema: {
       type: "object",
-      properties: { order_id: { type: "string" }, profile: {}, input: {} },
+      properties: { url: URL_PROP, sku: { type: "string", enum: ["website_quick", "website_full"] } },
+      required: ["url"],
+    },
+  },
+  {
+    name: "verify_check_site",
+    description:
+      "Run a pre-launch QA check on a live site: real Chromium on desktop + mobile, HTTP status, broken links, title/meta/H1, Open Graph, mobile overflow, console errors, screenshots. Uses today's free Quick Check, else prepaid credit, else returns a Stripe checkout_url for a human to pay ($3 Quick / $12 Full). Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: URL_PROP,
+        sku: { type: "string", enum: ["website_quick", "website_full"], default: "website_quick" },
+        paths: { type: "array", items: { type: "string" }, description: "website_full only: extra paths like /pricing" },
+        brief: { type: "string", description: "Optional: what the site must do" },
+        required_terms: { type: "array", items: { type: "string" } },
+        required_ctas: { type: "array", items: { type: "string" } },
+        pay_with: { type: "string", enum: ["auto", "free", "credit", "checkout"], default: "auto" },
+      },
+      required: ["url"],
     },
   },
   {
     name: "verify_get_job",
-    description: "Get job status",
-    inputSchema: { type: "object", properties: { job_id: { type: "string" } } },
+    description: "Status of a check (queued, running, completed, completed_with_warnings, failed_platform). Requires API key.",
+    inputSchema: { type: "object", properties: { job_id: { type: "string" } }, required: ["job_id"] },
   },
   {
     name: "verify_get_report",
-    description: "Get terminal report",
-    inputSchema: { type: "object", properties: { job_id: { type: "string" } } },
+    description: "Signed report for a finished check: score, decision, findings with fixes, report page link. Requires API key.",
+    inputSchema: { type: "object", properties: { job_id: { type: "string" } }, required: ["job_id"] },
+  },
+  {
+    name: "verify_get_credits",
+    description: "Prepaid credit balance and today's free-check usage. Requires API key.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "verify_buy_credits",
+    description: "Get a Stripe checkout_url for a credit pack: credit_pack_9 ($9 → $10) or credit_pack_29 ($29 → $35). A human pays. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { pack: { type: "string", enum: ["credit_pack_9", "credit_pack_29"], default: "credit_pack_9" } },
+    },
   },
 ];
 
@@ -135,7 +159,21 @@ export function handlePublicMcpMethod(body: McpRequestBody): McpPublicResult | n
       capabilities: { tools: { listChanged: false } },
       serverInfo: MCP_SERVER_INFO,
       instructions:
-        "Paid website acceptance testing. Discovery is public; every tools/call requires Authorization: Bearer fv_live_… (pricing: website_quick $3, website_full $12, credit_pack $100 → $110 usable).",
+        "Pre-launch website QA in about 60 seconds. No key needed for verify_get_capabilities, verify_quote or verify_signup (creates a free key: 1 free Quick Check/day). Other tools need Authorization: Bearer fv_live_…. Paid checks: Quick $3, Full $12; credit packs $9 → $10, $29 → $35.",
     }),
   };
+}
+
+/** JSON-RPC tool result carrying an error the model can read and act on. */
+export function toolError(body: McpRequestBody, text: string, data?: unknown): unknown {
+  return rpcResult(body, {
+    isError: true,
+    content: [{ type: "text", text: data ? `${text}\n${JSON.stringify(data, null, 2)}` : text }],
+  });
+}
+
+export function toolText(body: McpRequestBody, value: unknown): unknown {
+  return rpcResult(body, {
+    content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 2) }],
+  });
 }

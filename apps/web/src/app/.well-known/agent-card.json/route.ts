@@ -9,13 +9,13 @@ export async function GET() {
   const card = {
     name: "6Frame Verify",
     description:
-      "Paid agent-to-agent website acceptance-testing. Prove a website meets the brief before delivery.",
+      "Pre-launch website QA in ~60s: real Chromium on desktop + mobile checks HTTP status, broken links, SEO/social tags, mobile overflow, console errors; signed report with screenshots. Free key (1 Quick Check/day); $3 Quick, $12 Full.",
     url: `${base}/v1`,
     provider: {
       organization: "6Frame Studio",
       url: "https://6framestudio.com",
     },
-    version: "1.0.0",
+    version: "1.1.0",
     documentationUrl: `${base}/docs`,
     capabilities: {
       streaming: false,
@@ -24,7 +24,7 @@ export async function GET() {
     },
     authentication: {
       schemes: ["Bearer"],
-      credentials: "fv_live_ API keys — contact operator / create via admin",
+      credentials: `fv_live_ API keys — self-serve: POST ${base}/v1/keys {email} or ${base}/get-key`,
     },
     defaultInputModes: ["application/json"],
     defaultOutputModes: ["application/json"],
@@ -50,7 +50,7 @@ export async function GET() {
         id: "buy_prepaid_credits",
         name: "Buy prepaid credits",
         description:
-          "Buy a $100 credit pack ($110 usable) via Stripe Checkout; then pay website checks with payment_mode=credit",
+          "Buy a credit pack ($9 → $10 or $29 → $35) via Stripe Checkout; checks then draw from credit automatically",
         tags: ["verify", "billing", "credits"],
       },
       {

@@ -9,7 +9,7 @@ import { assertSafePublicHttpsUrl } from "@6frame/evaluators";
 import { authenticateBearer, requireScope } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { sha256 } from "@/lib/crypto";
-import { jsonOk, jsonError } from "@/lib/http";
+import { jsonOk, jsonError, unauthorized } from "@/lib/http";
 import { loadIdempotentResponse, saveIdempotentResponse } from "@/lib/idempotency";
 import { audit } from "@/lib/audit";
 import {
@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const auth = await authenticateBearer(req.headers.get("authorization"));
-  if (!auth) return jsonError("unauthorized", "Bearer fv_live_ API key required", { status: 401 });
+  if (!auth) return unauthorized("Bearer fv_live_ API key required");
   if (!requireScope(auth, "verify:write")) {
     return jsonError("forbidden", "Missing verify:write scope", { status: 403 });
   }
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   if (cached) return jsonOk(cached.response_body, { status: cached.response_status });
 
   const body = await req.json().catch(() => null);
-  if (body && typeof body === "object" && (body as { sku?: unknown }).sku === "credit_pack") {
+  if (body && typeof body === "object" && String((body as { sku?: unknown }).sku ?? "").startsWith("credit_pack")) {
     return jsonError("use_credit_checkout", "Buy credit packs via POST /v1/credits/checkout (no quote needed)", {
       status: 422,
     });
