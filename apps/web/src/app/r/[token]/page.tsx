@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Nav, Footer } from "@/components/Nav";
 import { query } from "@/lib/db";
-import { DECISION_LABEL, decisionClass } from "@/lib/samples";
+import { DECISION_LABEL, decisionClass, effectiveDecision } from "@/lib/samples";
 import { TERMINAL } from "@/lib/jobview";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,9 @@ async function load(token: string) {
      WHERE j.public_token=$1 ORDER BY r.report_version DESC NULLS LAST LIMIT 1`,
     [token],
   );
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (row?.release_decision) row.release_decision = effectiveDecision(row.release_decision, row.artifact_json?.summary?.fail);
+  return row;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {

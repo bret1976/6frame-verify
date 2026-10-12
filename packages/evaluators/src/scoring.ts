@@ -51,11 +51,10 @@ export function scoreFindings(findings: Finding[]): {
   if (criticalOrHighFail || score < 75) {
     return { score, release_decision: "fail", summary };
   }
-  if (score >= 90 && summary.not_evaluable === 0) {
+  // "pass" (Ready to launch) only when no check failed. Any non-blocking
+  // fail downgrades to pass_with_warnings (Launchable, with fixes).
+  if (score >= 90 && summary.not_evaluable === 0 && summary.fail === 0) {
     return { score, release_decision: "pass", summary };
-  }
-  if (score >= 90 && summary.not_evaluable > 0) {
-    return { score, release_decision: "pass_with_warnings", summary };
   }
   if (score >= 75) {
     return { score, release_decision: "pass_with_warnings", summary };
