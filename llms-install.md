@@ -9,7 +9,7 @@
   "mcpServers": {
     "6frame-verify": {
       "type": "streamableHttp",
-      "url": "https://web-production-1cede.up.railway.app/mcp"
+      "url": "https://siteverify.dev/mcp"
     }
   }
 }

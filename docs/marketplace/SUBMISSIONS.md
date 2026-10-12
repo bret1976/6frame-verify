@@ -1,7 +1,7 @@
 # Directory submissions — 6Frame Verify (prepared 2026-10-11)
 
-Repo: https://github.com/bret1976/6frame-verify · Site: https://web-production-1cede.up.railway.app
-MCP endpoint (Streamable HTTP): `https://web-production-1cede.up.railway.app/mcp`
+Repo: https://github.com/bret1976/6frame-verify · Site: https://siteverify.dev
+MCP endpoint (Streamable HTTP): `https://siteverify.dev/mcp`
 Auth: optional `Authorization: Bearer fv_live_…` (keyless: `verify_get_capabilities`, `verify_quote`, `verify_signup`)
 Registry name: `io.github.bret1976/6frame-verify` · Category: Testing / QA / Web / Developer tools
 Contact: 6Frame Studio (Bret Jenny)
@@ -24,10 +24,10 @@ checkout link for the human. Humans can buy a single $3 check on the homepage wi
 **Tools:** verify_get_capabilities, verify_quote, verify_signup, verify_check_site, verify_get_job, verify_get_report,
 verify_get_credits, verify_buy_credits (+ advanced: verify_create_order, verify_submit_job)
 **Pricing:** free key = 1 Quick Check/day · $3 Quick Check · $12 Full Check (10 pages) · $9→$10 and $29→$35 credit packs
-**Samples:** https://web-production-1cede.up.railway.app/samples
+**Samples:** https://siteverify.dev/samples
 **Client config:**
 ```json
-{ "mcpServers": { "6frame-verify": { "url": "https://web-production-1cede.up.railway.app/mcp",
+{ "mcpServers": { "6frame-verify": { "url": "https://siteverify.dev/mcp",
   "headers": { "Authorization": "Bearer fv_live_..." } } } }
 ```
 

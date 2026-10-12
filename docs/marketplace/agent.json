@@ -14,11 +14,11 @@
   ],
   "endpoint": {
     "transport": "mcp-http",
-    "url": "https://web-production-1cede.up.railway.app/mcp"
+    "url": "https://siteverify.dev/mcp"
   },
   "pricing": {
     "model": "apikey"
   },
-  "homepage": "https://web-production-1cede.up.railway.app",
+  "homepage": "https://siteverify.dev",
   "repository": "https://github.com/bret1976/6frame-verify"
 }
