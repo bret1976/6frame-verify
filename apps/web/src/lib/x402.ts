@@ -13,8 +13,11 @@ const CHAIN_ID: Record<string, number> = { base: 8453, "base-sepolia": 84532 };
 
 export type X402Config = { payTo: string; network: string; asset: string; facilitator: string };
 
+let stripeDeposit: string | null = null;
+export function setStripeDepositAddress(a: string | null) { stripeDeposit = a; }
+
 export function x402Config(env: Record<string, string | undefined> = process.env): X402Config | null {
-  const payTo = (env.X402_PAY_TO || "").trim();
+  const payTo = (env.X402_PAY_TO || (env.X402_STRIPE_DEPOSIT === "1" ? stripeDeposit : "") || "").trim();
   if (!/^0x[0-9a-fA-F]{40}$/.test(payTo)) return null;
   const network = (env.X402_NETWORK || "base").trim();
   if (!USDC[network]) return null;

@@ -6,7 +6,7 @@
  * Everything else — notably every tools/call — still requires a Bearer fv_live_ key.
  */
 
-export const MCP_SERVER_INFO = { name: "6frame-verify", title: "6Frame Verify", version: "1.2.0" } as const;
+export const MCP_SERVER_INFO = { name: "6frame-verify", title: "6Frame Verify", version: "1.3.0" } as const;
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] as const;
 export const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
@@ -57,7 +57,7 @@ export const MCP_TOOLS = [
   {
     name: "verify_check_site",
     description:
-      "Run a pre-launch QA check on a live site: real Chromium on desktop + mobile, HTTP status, broken links, title/meta/H1, Open Graph, mobile overflow, console errors, screenshots. Uses today's free Quick Check, else prepaid credit, else returns a Stripe checkout_url for a human to pay ($3 Quick / $12 Full). Agents can also pay autonomously with x402 (USDC on Base): the 402 result lists accepts[]; retry with x402_payment. With x402 enabled no API key is needed.",
+      "Run a pre-launch QA check on a live site: real Chromium on desktop + mobile, HTTP status, broken links, title/meta/H1, Open Graph, mobile overflow, console errors, screenshots. Uses today's free Quick Check, else prepaid credit, else returns payment options: a Stripe checkout_url for a human ($3 Quick / $12 Full) and, when available, x402 USDC-on-Base details (accepts[]) so an agent can pay itself — retry with x402_payment. No API key is needed for the x402 path.",
     inputSchema: {
       type: "object",
       properties: {

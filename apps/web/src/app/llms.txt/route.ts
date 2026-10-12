@@ -1,10 +1,12 @@
 import { env } from "@/lib/env";
 import { MCP_TOOLS, KEYLESS_TOOLS } from "@/lib/mcp-protocol";
 import { x402Config } from "@/lib/x402";
+import { ensureStripeDeposit } from "@/lib/x402-stripe";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  await ensureStripeDeposit().catch(() => {});
   const b = env().APP_BASE_URL;
   const tools = MCP_TOOLS.map((t) => `- ${t.name}${KEYLESS_TOOLS.has(t.name) ? " (no key)" : ""}: ${t.description}`).join("\n");
   const x = x402Config();

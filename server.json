@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bret1976/6frame-verify",
   "title": "6Frame Verify",
-  "description": "Pre-launch website QA in 60s: real Chromium checks links, SEO, mobile, console. Free key, $3/check.",
-  "version": "1.2.0",
+  "description": "Pre-launch website QA in 60s via real Chromium. $3/check; agents can pay in USDC (x402).",
+  "version": "1.3.0",
   "repository": {
     "url": "https://github.com/bret1976/6frame-verify",
     "source": "github"
