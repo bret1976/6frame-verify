@@ -90,4 +90,4 @@ pnpm dev:worker
 
 ## License
 
-Proprietary © 6Frame Studio
+MIT © 6Frame Studio — see [LICENSE](LICENSE).

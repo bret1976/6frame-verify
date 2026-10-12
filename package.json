@@ -21,5 +21,6 @@
       "esbuild",
       "msgpackr-extract"
     ]
-  }
+  },
+  "license": "MIT"
 }
