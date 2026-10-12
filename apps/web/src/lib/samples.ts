@@ -16,7 +16,7 @@ export async function listSamples(limit = 6): Promise<SampleRow[]> {
       token: r.token,
       url: r.url,
       score: r.score,
-      decision: r.decision,
+      decision: effectiveDecision(r.decision, r.summary?.fail),
       generated_at: r.generated_at,
       pass: r.summary?.pass ?? 0,
       warning: r.summary?.warning ?? 0,
@@ -33,6 +33,10 @@ export const DECISION_LABEL: Record<string, string> = {
   fail: "Fix before launch",
   cannot_evaluate: "Could not evaluate",
 };
+/** Normalise legacy reports stored as "pass" despite failed checks. */
+export function effectiveDecision(d: string, fail?: number | null) {
+  return d === "pass" && (fail ?? 0) > 0 ? "pass_with_warnings" : d;
+}
 export function decisionClass(d: string) {
   return d === "pass" ? "ok" : d === "pass_with_warnings" ? "warn" : d === "fail" ? "bad" : "muted";
 }
