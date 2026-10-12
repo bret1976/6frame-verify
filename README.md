@@ -67,10 +67,20 @@ pnpm dev:worker
 
 ## Machine discovery
 
-- `GET /.well-known/openapi.json`
-- `GET /.well-known/agent-card.json`
+- `POST /mcp` — MCP Streamable HTTP (discovery + keyless tools work without a key; Bearer `fv_live_` for paid tools)
+- `GET /.well-known/mcp/server-card.json` (also `/.well-known/mcp`, `/.well-known/mcp.json`) — MCP server card
+- `GET /server.json` — official MCP Registry entry (`io.github.bret1976/6frame-verify`)
+- `GET /llms.txt` — agent-readable summary
+- `GET /.well-known/openapi.json` (alias `/openapi.json`)
+- `GET /.well-known/agent-card.json` (alias `/.well-known/agent.json`) — A2A
 - `GET /v1/capabilities`
-- `POST /mcp` (Bearer API key)
+
+## Listed on
+
+- Official MCP Registry: `io.github.bret1976/6frame-verify` — https://registry.modelcontextprotocol.io/v0/servers?search=io.github.bret1976/6frame-verify
+- Glama: https://glama.ai/mcp/servers/bret1976/6frame-verify
+
+[![bret1976/6frame-verify MCP server](https://glama.ai/mcp/servers/bret1976/6frame-verify/badges/score.svg)](https://glama.ai/mcp/servers/bret1976/6frame-verify)
 
 ## Hard rules
 
