@@ -26,6 +26,7 @@ import { selfServeSignup } from "@/lib/signup";
 import { clientIp } from "@/lib/ratelimit";
 import { runCheck, x402AnonymousAuth } from "@/lib/checks";
 import { x402Config } from "@/lib/x402";
+import { ensureStripeDeposit } from "@/lib/x402-stripe";
 import { jobForTenant, reportForTenant } from "@/lib/jobview";
 import { balanceOf } from "@/lib/credits";
 import { query } from "@/lib/db";
@@ -68,6 +69,7 @@ function rpcOut(body: McpRequestBody, payload: unknown) {
 }
 
 export async function POST(req: Request) {
+  await ensureStripeDeposit().catch(() => {});
   const body = ((await req.json().catch(() => ({}))) ?? {}) as McpRequestBody;
 
   const pub = handlePublicMcpMethod(body);

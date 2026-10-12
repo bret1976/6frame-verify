@@ -3,6 +3,7 @@ import { jsonOk, jsonError, unauthorized } from "@/lib/http";
 import { loadIdempotentResponse, saveIdempotentResponse } from "@/lib/idempotency";
 import { runCheck, x402AnonymousAuth } from "@/lib/checks";
 import { x402Config } from "@/lib/x402";
+import { ensureStripeDeposit } from "@/lib/x402-stripe";
 import { baseUrl } from "@/lib/links";
 import { clientIp } from "@/lib/ratelimit";
 
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
  * retry with X-PAYMENT (or PAYMENT-SIGNATURE) to pay per check autonomously.
  */
 export async function POST(req: Request) {
+  await ensureStripeDeposit().catch(() => {});
   const payment = req.headers.get("x-payment") ?? req.headers.get("payment-signature");
   const resource = `${baseUrl()}/v1/checks`;
   const auth = await authenticateBearer(req.headers.get("authorization"));

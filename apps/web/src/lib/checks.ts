@@ -16,6 +16,7 @@ import { getStripe } from "./stripe";
 import { isStripeReady } from "./env";
 import { audit } from "./audit";
 import { reportPageUrl, baseUrl } from "./links";
+import { ensureStripeDeposit, recordStripePayment } from "./x402-stripe";
 import {
   x402Config, buildRequirements, paymentRequiredBody, paymentRequiredHeaderV2, decodePaymentHeader,
   precheck, facilitatorCall, paymentResponseHeader,
@@ -74,6 +75,7 @@ export async function runCheck(auth: AuthContext, raw: unknown, ip: string, x402
     return { status: 422, body: { error: { code: "invalid_input", message: "Body needs {\"url\":\"https://...\"}", details: parsed.error.flatten() } } };
   }
   const req = parsed.data;
+  await ensureStripeDeposit();
   const xcfg = x402Config();
   const payHeader = x402?.payment ?? null;
   if (x402?.anonymous || payHeader) req.pay_with = "x402";
@@ -175,6 +177,7 @@ export async function runCheck(auth: AuthContext, raw: unknown, ip: string, x402
       const job = await insertJobForOrder(client, { tenantId: auth.tenantId, orderId, input, callback: req.callback ?? null });
       return { orderId, job };
     });
+    await recordStripePayment(payId, tx, amount, { order_id: res.orderId, job_id: res.job.id, sku: req.sku, payer: String(st.payer ?? a.from) });
     await enqueueOrFail(res.job.id, res.orderId);
     await audit({ tenant_id: auth.tenantId, actor_type: "api_client", actor_id: auth.clientId, action: "check.x402_paid", object_type: "job", object_id: res.job.id });
     return {
