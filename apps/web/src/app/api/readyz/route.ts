@@ -16,7 +16,7 @@ export async function GET() {
       ready: true,
       database: "ok",
       stripe,
-      x402: { enabled: !!xc, network: xc?.network ?? null, pay_to: xc?.payTo ?? null, stripe_deposit: stripeDepositStatus() },
+      x402: { enabled: !!xc, network: xc?.network ?? null, pay_to: xc?.payTo ?? null, stripe_deposit: { enabled: stripeDepositStatus().enabled, ok: !stripeDepositStatus().last_error } },
       redis: process.env.REDIS_URL ? "configured" : "missing",
     });
   } catch (e) {
