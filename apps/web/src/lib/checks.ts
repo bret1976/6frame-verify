@@ -16,6 +16,10 @@ import { getStripe } from "./stripe";
 import { isStripeReady } from "./env";
 import { audit } from "./audit";
 import { reportPageUrl, baseUrl } from "./links";
+import {
+  x402Config, buildRequirements, paymentRequiredBody, paymentRequiredHeaderV2, decodePaymentHeader,
+  precheck, facilitatorCall, paymentResponseHeader,
+} from "./x402";
 
 export const CheckRequestSchema = z.object({
   url: z.string().url(),
@@ -23,7 +27,7 @@ export const CheckRequestSchema = z.object({
   sku: z.enum(["website_quick", "website_full"]).default("website_quick"),
   /** Extra paths for website_full (max 10 incl. "/"). */
   paths: z.array(z.string().startsWith("/").max(300)).max(10).optional(),
-  pay_with: z.enum(["auto", "free", "credit", "checkout"]).default("auto"),
+  pay_with: z.enum(["auto", "free", "credit", "checkout", "x402"]).default("auto"),
   required_terms: z.array(z.string().max(120)).max(20).optional(),
   required_ctas: z.array(z.string().max(120)).max(20).optional(),
   forbidden_terms: z.array(z.string().max(120)).max(20).optional(),
@@ -31,7 +35,18 @@ export const CheckRequestSchema = z.object({
 });
 export type CheckRequest = z.infer<typeof CheckRequestSchema>;
 
-export type CheckOutcome = { status: number; body: Record<string, unknown> };
+export type CheckOutcome = { status: number; body: Record<string, unknown>; headers?: Record<string, string> };
+
+/** x402 context: the payment header (X-PAYMENT / PAYMENT-SIGNATURE / MCP arg) and the resource URL to quote. */
+export type X402Ctx = { payment?: string | null; resource: string; anonymous?: boolean };
+
+/** Shared tenant for keyless agents that pay per call with x402 (no free tier, no credit). */
+export async function x402AnonymousAuth(): Promise<AuthContext> {
+  const email = "x402-agents@siteverify.dev";
+  const { rows } = await query<{ id: string }>(`SELECT id FROM tenants WHERE email=$1 AND type='buyer' LIMIT 1`, [email]);
+  const id = rows[0]?.id ?? (await query<{ id: string }>(`INSERT INTO tenants (name, type, status, email) VALUES ('x402 keyless agents','buyer','active',$1) RETURNING id`, [email])).rows[0].id;
+  return { clientId: "x402-anon", tenantId: id, scopes: ["verify:read", "verify:write"], keyPrefix: "x402", rateLimit: 60 };
+}
 
 export function buildWebsiteInput(req: { url: string; brief?: string; sku: CheckSku; paths?: string[]; required_terms?: string[]; required_ctas?: string[]; forbidden_terms?: string[] }) {
   const paths = req.sku === "website_full" ? Array.from(new Set(["/", ...(req.paths ?? [])])).slice(0, 10) : ["/"];
@@ -53,13 +68,16 @@ const FREE_GLOBAL_DAILY_MAX = Number(process.env.FREE_CHECKS_GLOBAL_DAILY_MAX ||
 /**
  * One-call check: free daily Quick Check → prepaid credit → Stripe Checkout link (402).
  */
-export async function runCheck(auth: AuthContext, raw: unknown, ip: string): Promise<CheckOutcome> {
+export async function runCheck(auth: AuthContext, raw: unknown, ip: string, x402?: X402Ctx): Promise<CheckOutcome> {
   const parsed = CheckRequestSchema.safeParse(raw);
   if (!parsed.success) {
     return { status: 422, body: { error: { code: "invalid_input", message: "Body needs {\"url\":\"https://...\"}", details: parsed.error.flatten() } } };
   }
   const req = parsed.data;
-  const lim = await rateLimit("checks_key", auth.clientId, [{ seconds: HOUR, max: 30 }]);
+  const xcfg = x402Config();
+  const payHeader = x402?.payment ?? null;
+  if (x402?.anonymous || payHeader) req.pay_with = "x402";
+  const lim = await rateLimit("checks_key", x402?.anonymous ? `x402:${subjectHash(ip)}` : auth.clientId, [{ seconds: HOUR, max: 30 }]);
   if (!lim.ok) {
     return { status: 429, body: { error: { code: "rate_limited", message: `Too many checks. Retry in ${lim.retry_after_sec}s`, details: lim } } };
   }
@@ -96,6 +114,73 @@ export async function runCheck(auth: AuthContext, raw: unknown, ip: string): Pro
       report_api: `${baseUrl()}/v1/jobs/${job.id}/report`,
       deadline_at: job.deadline_at,
       ...extra,
+    };
+  }
+
+  const xreq = xcfg
+    ? buildRequirements(xcfg, amount, x402?.resource ?? `${baseUrl()}/v1/checks`, `6Frame Verify ${req.sku === "website_full" ? "Full" : "Quick"} Check of ${req.url} ($${(amount / 100).toFixed(2)} USDC)`)
+    : null;
+  const x402Info = (error?: string) =>
+    xreq
+      ? {
+          ...paymentRequiredBody(xreq, error),
+          how_to_pay: "x402: sign an EIP-3009 USDC transferWithAuthorization for `accepts[0]` and retry the same request with header X-PAYMENT: <base64 payload> (MCP: pass it as argument x402_payment). No gas needed. Once settled the check is queued and you get report_page (public URL, ready in ~60s).",
+        }
+      : undefined;
+  const x402Headers = () => (xreq ? { "PAYMENT-REQUIRED": paymentRequiredHeaderV2(xreq) } : undefined);
+
+  // 0) x402 autonomous payment (USDC)
+  if (req.pay_with === "x402") {
+    if (!xcfg || !xreq) {
+      return { status: 503, body: { error: { code: "x402_not_enabled", message: "x402 payments are not enabled yet. Use an API key (free daily check / credits / checkout).", signup: `${baseUrl()}/get-key` } } };
+    }
+    const fail = (code: string, message: string) => ({
+      status: 402,
+      body: { ...x402Info(message), error: { code, message } },
+      headers: x402Headers(),
+    });
+    if (!payHeader) return fail("payment_required", `Pay $${(amount / 100).toFixed(2)} USDC on ${xcfg.network} via x402 to run this check.`);
+    const p = decodePaymentHeader(payHeader);
+    if (!p) return fail("invalid_payment", "Could not decode the x402 payment payload (base64 JSON).");
+    const pre = precheck(p, xreq);
+    if (pre) return fail(pre, `Payment rejected: ${pre}`);
+    const a = p.payload.authorization;
+    const claim = await query(
+      `INSERT INTO x402_payments (network, payer, pay_to, amount_atomic, nonce, sku, tenant_id, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'verifying') ON CONFLICT (nonce) DO NOTHING RETURNING id`,
+      [p.network, a.from, a.to, a.value, a.nonce, req.sku, auth.tenantId],
+    );
+    if (!claim.rows[0]) return fail("payment_replayed", "This payment authorization was already used.");
+    const payId = claim.rows[0].id as string;
+    const v = await facilitatorCall(xcfg, "verify", p, xreq).catch((e: Error): Record<string, unknown> => ({ isValid: false, invalidReason: e.message }));
+    if (!v.isValid) {
+      await query(`UPDATE x402_payments SET status='invalid' WHERE id=$1`, [payId]);
+      return fail("payment_invalid", `Facilitator rejected payment: ${String(v.invalidReason ?? "invalid")}`);
+    }
+    const st = await facilitatorCall(xcfg, "settle", p, xreq).catch((e: Error): Record<string, unknown> => ({ success: false, errorReason: e.message }));
+    if (!st.success) {
+      await query(`UPDATE x402_payments SET status='settle_failed' WHERE id=$1`, [payId]);
+      return fail("payment_settle_failed", `Payment did not settle: ${String(st.errorReason ?? "unknown")}`);
+    }
+    const tx = String(st.transaction ?? "");
+    const res = await withTransaction(async (client) => {
+      const quoteId = await makeQuote(client);
+      const { rows: or } = await client.query(
+        `INSERT INTO orders (tenant_id, quote_id, sku, amount, currency, status, paid_at, public_token, payment_source)
+         VALUES ($1,$2,$3,$4,'usd','paid',now(),$5,'x402') RETURNING id`,
+        [auth.tenantId, quoteId, req.sku, amount, publicToken()],
+      );
+      const orderId = or[0].id as string;
+      await client.query(`UPDATE x402_payments SET status='settled', tx_hash=$1, order_id=$2 WHERE id=$3`, [tx || null, orderId, payId]);
+      const job = await insertJobForOrder(client, { tenantId: auth.tenantId, orderId, input, callback: req.callback ?? null });
+      return { orderId, job };
+    });
+    await enqueueOrFail(res.job.id, res.orderId);
+    await audit({ tenant_id: auth.tenantId, actor_type: "api_client", actor_id: auth.clientId, action: "check.x402_paid", object_type: "job", object_id: res.job.id });
+    return {
+      status: 201,
+      body: queuedBody(res.job, res.orderId, "x402", { payment: { network: xcfg.network, transaction: tx, payer: st.payer ?? a.from, amount_usdc: (amount / 100).toFixed(2) } }),
+      headers: { "X-PAYMENT-RESPONSE": paymentResponseHeader(st) },
     };
   }
 
@@ -169,6 +254,7 @@ export async function runCheck(auth: AuthContext, raw: unknown, ip: string): Pro
 
   // 3) Stripe Checkout — the job runs automatically once Stripe confirms payment
   if (!isStripeReady()) {
+    if (xreq) return { status: 402, body: { ...x402Info(), error: { code: "payment_required", message: "Pay via x402 (USDC)." } }, headers: x402Headers() };
     return { status: 503, body: { error: { code: "stripe_not_configured", message: "Payments unavailable", retryable: true } } };
   }
   const { order, session, order_url } = await createCheckoutForCheck(getStripe()!, {
@@ -192,6 +278,8 @@ export async function runCheck(auth: AuthContext, raw: unknown, ip: string): Pro
       amount_cents: amount,
       sku: req.sku,
       buy_credits: "POST /v1/credits/checkout {\"pack\":\"credit_pack_9\"} ($9 → $10 credit) or credit_pack_29 ($29 → $35)",
+      ...(xreq ? { agent_payment: "No human needed: pay this check yourself with x402 (USDC) — see accepts[] and how_to_pay.", x402Version: 1, accepts: x402Info()!.accepts, how_to_pay: x402Info()!.how_to_pay } : {}),
     },
+    headers: x402Headers(),
   };
 }

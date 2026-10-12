@@ -57,7 +57,7 @@ export const MCP_TOOLS = [
   {
     name: "verify_check_site",
     description:
-      "Run a pre-launch QA check on a live site: real Chromium on desktop + mobile, HTTP status, broken links, title/meta/H1, Open Graph, mobile overflow, console errors, screenshots. Uses today's free Quick Check, else prepaid credit, else returns a Stripe checkout_url for a human to pay ($3 Quick / $12 Full). Requires API key.",
+      "Run a pre-launch QA check on a live site: real Chromium on desktop + mobile, HTTP status, broken links, title/meta/H1, Open Graph, mobile overflow, console errors, screenshots. Uses today's free Quick Check, else prepaid credit, else returns a Stripe checkout_url for a human to pay ($3 Quick / $12 Full). Agents can also pay autonomously with x402 (USDC on Base): the 402 result lists accepts[]; retry with x402_payment. With x402 enabled no API key is needed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -67,7 +67,8 @@ export const MCP_TOOLS = [
         brief: { type: "string", description: "Optional: what the site must do" },
         required_terms: { type: "array", items: { type: "string" } },
         required_ctas: { type: "array", items: { type: "string" } },
-        pay_with: { type: "string", enum: ["auto", "free", "credit", "checkout"], default: "auto" },
+        pay_with: { type: "string", enum: ["auto", "free", "credit", "checkout", "x402"], default: "auto" },
+        x402_payment: { type: "string", description: "Optional: base64 x402 X-PAYMENT payload (EIP-3009 USDC authorization) for the accepts[] requirement returned by a previous call. Pays for this check with no human." },
       },
       required: ["url"],
     },

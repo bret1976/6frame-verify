@@ -24,7 +24,8 @@ import {
 } from "@/lib/mcp-protocol";
 import { selfServeSignup } from "@/lib/signup";
 import { clientIp } from "@/lib/ratelimit";
-import { runCheck } from "@/lib/checks";
+import { runCheck, x402AnonymousAuth } from "@/lib/checks";
+import { x402Config } from "@/lib/x402";
 import { jobForTenant, reportForTenant } from "@/lib/jobview";
 import { balanceOf } from "@/lib/credits";
 import { query } from "@/lib/db";
@@ -50,7 +51,13 @@ function capabilities() {
     skus: offeredSkuCatalog(),
     free_tier: { quick_checks_per_day_per_key: FREE_QUICK_CHECKS_PER_DAY },
     profiles: OFFERED_PROFILES,
-    payments: { live: stripeStatus().mode === "live", configured: stripeStatus().configured },
+    payments: {
+      live: stripeStatus().mode === "live",
+      configured: stripeStatus().configured,
+      x402: x402Config()
+        ? { enabled: true, network: x402Config()!.network, asset: "USDC", pay_to: x402Config()!.payTo, how: "Call verify_check_site without a key (or with no credit); it returns x402 accepts[]. Sign an EIP-3009 USDC authorization and call again with argument x402_payment=<base64 X-PAYMENT payload>. REST: POST /v1/checks with header X-PAYMENT." }
+        : { enabled: false },
+    },
     signup: { url: signupUrl(), api: "POST /v1/keys {email}", mcp_tool: "verify_signup" },
     rest: `${baseUrl()}/v1`,
   };
@@ -106,6 +113,16 @@ export async function POST(req: Request) {
   }
 
   const auth = await authenticateBearer(req.headers.get("authorization"));
+  if (!auth && method === "tools/call" && name === "verify_check_site" && x402Config()) {
+    const out = await runCheck(await x402AnonymousAuth(), args, clientIp(req), {
+      payment: typeof args.x402_payment === "string" ? args.x402_payment : null,
+      resource: `${baseUrl()}/mcp#verify_check_site`,
+      anonymous: true,
+    });
+    if (out.status === 402) return rpcOut(body, toolError(body, "Payment required — pay autonomously with x402 (USDC), or use an API key", out.body));
+    if (out.status >= 400) return rpcOut(body, toolError(body, "Check not started", out.body));
+    return rpcOut(body, toolText(body, out.body));
+  }
   if (!auth) {
     if (isJsonRpc(body) && method === "tools/call") {
       return rpcOut(
@@ -136,9 +153,12 @@ export async function POST(req: Request) {
     case "verify_get_capabilities":
       return rpcOut(body, toolText(body, capabilities()));
     case "verify_check_site": {
-      const out = await runCheck(auth, args, clientIp(req));
+      const out = await runCheck(auth, args, clientIp(req), {
+        payment: typeof args.x402_payment === "string" ? args.x402_payment : null,
+        resource: `${baseUrl()}/mcp#verify_check_site`,
+      });
       if (out.status >= 400 && out.status !== 402) return rpcOut(body, toolError(body, "Check not started", out.body));
-      return rpcOut(body, out.status === 402 ? toolError(body, "Payment needed — give checkout_url to a human", out.body) : toolText(body, out.body));
+      return rpcOut(body, out.status === 402 ? toolError(body, x402Config() ? "Payment needed — pay now with x402 (USDC, no human) or give checkout_url to a human" : "Payment needed — give checkout_url to a human", out.body) : toolText(body, out.body));
     }
     case "verify_get_job": {
       const j = await jobForTenant(String(args.job_id ?? ""), auth.tenantId);

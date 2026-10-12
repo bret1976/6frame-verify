@@ -3,11 +3,13 @@ import { API_VERSION } from "@6frame/config";
 import { requestId } from "./crypto";
 import { signupUrl, SIGNUP_HINT } from "./links";
 
-export function jsonOk<T>(body: T, init?: { status?: number; requestId?: string }) {
+export function jsonOk<T>(body: T, init?: { status?: number; requestId?: string; headers?: Record<string, string> }) {
   const rid = init?.requestId ?? requestId();
   return NextResponse.json(body, {
     status: init?.status ?? 200,
     headers: {
+      ...(init?.headers ?? {}),
+      ...(init?.headers ? { "Access-Control-Expose-Headers": Object.keys(init.headers).join(", ") } : {}),
       "X-Request-Id": rid,
       "X-API-Version": API_VERSION,
       "Cache-Control": "no-store",
