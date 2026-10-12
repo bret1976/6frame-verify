@@ -52,6 +52,7 @@ export async function ensureStripeDeposit(): Promise<void> {
     lastError = null;
   } catch (e) {
     lastError = (e as Error).message;
+    console.error("[x402] stripe deposit address unavailable:", lastError.slice(0, 300));
   }
 }
 
