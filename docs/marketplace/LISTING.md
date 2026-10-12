@@ -1,11 +1,11 @@
 # 6Frame Verify — Marketplace Listing Pack
 
 ## Live
-- Site: https://web-production-1cede.up.railway.app
-- Capabilities: https://web-production-1cede.up.railway.app/v1/capabilities
-- OpenAPI: https://web-production-1cede.up.railway.app/.well-known/openapi.json
-- Agent Card: https://web-production-1cede.up.railway.app/.well-known/agent-card.json
-- MCP: https://web-production-1cede.up.railway.app/mcp
+- Site: https://siteverify.dev
+- Capabilities: https://siteverify.dev/v1/capabilities
+- OpenAPI: https://siteverify.dev/.well-known/openapi.json
+- Agent Card: https://siteverify.dev/.well-known/agent-card.json
+- MCP: https://siteverify.dev/mcp
 - Repo: https://github.com/bret1976/6frame-verify
 
 ## Pricing (v1.1, 2026-10-11)

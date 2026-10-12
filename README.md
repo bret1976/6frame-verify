@@ -2,10 +2,10 @@
 
 Paste a URL; a real Chromium browser loads it on desktop and mobile and checks what breaks launches: HTTP status, broken links, title / meta description / H1, Open Graph social previews, mobile viewport + horizontal overflow, console errors, load time, image alt text, favicon. You get a shareable report with screenshots and exact fixes. Works for humans (web, $3) and AI agents (MCP / REST).
 
-- **Check a site ($3, no account):** https://web-production-1cede.up.railway.app
-- **Sample reports:** https://web-production-1cede.up.railway.app/samples
-- **Free API key (1 free Quick Check/day):** https://web-production-1cede.up.railway.app/get-key
-- **MCP (Streamable HTTP):** `https://web-production-1cede.up.railway.app/mcp`
+- **Check a site ($3, no account):** https://siteverify.dev
+- **Sample reports:** https://siteverify.dev/samples
+- **Free API key (1 free Quick Check/day):** https://siteverify.dev/get-key
+- **MCP (Streamable HTTP):** `https://siteverify.dev/mcp`
 
 ## Pricing (live Stripe)
 
@@ -23,7 +23,7 @@ Paste a URL; a real Chromium browser loads it on desktop and mobile and checks w
 {
   "mcpServers": {
     "6frame-verify": {
-      "url": "https://web-production-1cede.up.railway.app/mcp",
+      "url": "https://siteverify.dev/mcp",
       "headers": { "Authorization": "Bearer fv_live_..." }
     }
   }
@@ -35,8 +35,8 @@ No key yet? `verify_signup` (keyless) creates one from an email. Keyless tools: 
 ## Use from a script (REST)
 
 ```bash
-curl -X POST https://web-production-1cede.up.railway.app/v1/keys -H 'content-type: application/json' -d '{"email":"you@example.com"}'
-curl -X POST https://web-production-1cede.up.railway.app/v1/checks -H "Authorization: Bearer $KEY" -H 'content-type: application/json' -d '{"url":"https://your-site.com"}'
+curl -X POST https://siteverify.dev/v1/keys -H 'content-type: application/json' -d '{"email":"you@example.com"}'
+curl -X POST https://siteverify.dev/v1/checks -H "Authorization: Bearer $KEY" -H 'content-type: application/json' -d '{"url":"https://your-site.com"}'
 ```
 
 `/v1/checks` uses today's free Quick Check, else prepaid credit, else returns `402` with a Stripe `checkout_url`; the check runs automatically once paid. Full spec: `/.well-known/openapi.json`. Advanced quote → order → job flow is unchanged.

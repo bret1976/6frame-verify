@@ -191,7 +191,7 @@ export async function closeBrowser() {
   }
 }
 
-const UA = "Mozilla/5.0 (compatible; 6FrameVerify/1.1; +https://web-production-1cede.up.railway.app)";
+const UA = "Mozilla/5.0 (compatible; 6FrameVerify/1.1; +https://siteverify.dev)";
 
 async function fetchStatus(url: string): Promise<number> {
   if (!/^https:/i.test(url)) return 0;

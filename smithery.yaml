@@ -1,7 +1,7 @@
 # Smithery: hosted remote server (Streamable HTTP). No local build.
 runtime: "external"
 remote:
-  url: "https://web-production-1cede.up.railway.app/mcp"
+  url: "https://siteverify.dev/mcp"
   transport: "streamable-http"
 startCommand:
   type: http

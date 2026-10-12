@@ -15,7 +15,7 @@ export async function GET() {
       organization: "6Frame Studio",
       url: "https://6framestudio.com",
     },
-    version: "1.1.0",
+    version: "1.2.0",
     documentationUrl: `${base}/docs`,
     capabilities: {
       streaming: false,
