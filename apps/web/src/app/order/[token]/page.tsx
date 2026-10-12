@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Nav, Footer } from "@/components/Nav";
 import { query } from "@/lib/db";
@@ -92,9 +91,11 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
       </div>
       {job?.public_token && (
         <p>
-          <Link className="btn" href={`/r/${job.public_token}`}>
+          {/* Plain <a>: a full document navigation. A client-side <Link> transition could be
+              swallowed by this page's pending meta-refresh reload (first click "did nothing"). */}
+          <a className="btn" href={`/r/${job.public_token}`} data-testid="view-report">
             {jobDone ? "View report" : "Open live report page"}
-          </Link>
+          </a>
         </p>
       )}
       <p className="fine">Bookmark this page — it is your private link to this order.</p>
