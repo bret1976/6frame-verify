@@ -72,8 +72,14 @@ test("verify_get_capabilities works without a key", async () => {
   assert.equal(caps.skus.credit_pack_29.amount_cents, 2900);
 });
 
-test("verify_signup without email → tool error (no key needed, no DB hit)", async () => {
-  const res = await POST(rpc("tools/call", { name: "verify_signup", arguments: {} }, 3));
+test("verify_signup: email is optional in the tool schema", () => {
+  const t = MCP_TOOLS.find((x) => x.name === "verify_signup")!;
+  assert.ok(!((t.inputSchema as { required?: string[] }).required ?? []).includes("email"));
+  assert.match(t.description, /no email/i);
+});
+
+test("verify_signup with an invalid email → tool error (no DB hit)", async () => {
+  const res = await POST(rpc("tools/call", { name: "verify_signup", arguments: { email: "not-an-email" } }, 3));
   assert.equal(res.status, 200);
   const j = await res.json();
   assert.equal(j.result.isError, true);

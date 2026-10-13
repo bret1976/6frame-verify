@@ -23,7 +23,7 @@ export async function GET() {
 
 ## Connect (MCP, Streamable HTTP)
 - Endpoint: ${b}/mcp
-- Auth: optional header \`Authorization: Bearer fv_live_...\`. Get a free key with the verify_signup tool or POST ${b}/v1/keys {"email": "..."} (1 free Quick Check/day).
+- Auth: optional header \`Authorization: Bearer fv_live_...\`. Get a free key with the verify_signup tool or POST ${b}/v1/keys with body {} — no email needed (email optional). 1 free Quick Check/day per key, max 3 per network/day.
 - Client config: {"mcpServers":{"6frame-verify":{"url":"${b}/mcp","headers":{"Authorization":"Bearer fv_live_..."}}}}
 - Official MCP Registry name: io.github.bret1976/6frame-verify
 

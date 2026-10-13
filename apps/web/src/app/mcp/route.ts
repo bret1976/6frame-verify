@@ -60,7 +60,7 @@ function capabilities() {
         ? { enabled: true, network: x402Config()!.network, asset: "USDC", pay_to: x402Config()!.payTo, how: "Call verify_check_site without a key (or with no credit); it returns x402 accepts[]. Sign an EIP-3009 USDC authorization and call again with argument x402_payment=<base64 X-PAYMENT payload>. REST: POST /v1/checks with header X-PAYMENT." }
         : { enabled: false },
     },
-    signup: { url: signupUrl(), api: "POST /v1/keys {email}", mcp_tool: "verify_signup" },
+    signup: { url: signupUrl(), api: "POST /v1/keys {} (email optional)", email_required: false, mcp_tool: "verify_signup" },
     rest: `${baseUrl()}/v1`,
   };
 }
@@ -159,7 +159,7 @@ async function handlePost(req: Request, body: McpRequestBody): Promise<Response>
       resource: `${baseUrl()}/mcp#verify_check_site`,
       anonymous: true,
     });
-    if (out.status === 402) return rpcOut(body, toolError(body, "Payment required ($3). Two ways forward: (1) FREE: call verify_signup with an email to get an API key that includes 1 free Quick Check per day, then call verify_check_site again with header Authorization: Bearer <key>; or (2) pay autonomously with x402 (USDC on Base) using accepts[] below and retry with argument x402_payment.", out.body));
+    if (out.status === 402) return rpcOut(body, toolError(body, "Payment required ($3). Two ways forward: (1) FREE: call verify_signup with no arguments (no email needed) to get an API key that includes 1 free Quick Check per day, then call verify_check_site again with header Authorization: Bearer <key>; or (2) pay autonomously with x402 (USDC on Base) using accepts[] below and retry with argument x402_payment.", out.body));
     if (out.status >= 400) return rpcOut(body, toolError(body, "Check not started", out.body));
     return rpcOut(body, toolText(body, out.body));
   }

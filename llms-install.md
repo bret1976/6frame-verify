@@ -16,7 +16,7 @@
 ```
 
 2. Call `verify_get_capabilities` (no key needed) to confirm it works.
-3. Get a free key: call `verify_signup` with the user's email (ask the user for it). Then add
+3. Get a free key: call `verify_signup` with no arguments (no email needed; email is optional). Then add
    `"headers": { "Authorization": "Bearer fv_live_..." }` to the config above.
 4. Run `verify_check_site` with `{ "url": "https://the-site-you-deployed" }`, then `verify_get_report`.
 
