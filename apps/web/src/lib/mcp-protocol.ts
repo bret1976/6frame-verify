@@ -17,6 +17,14 @@ export const PUBLIC_MCP_METHODS: ReadonlySet<string> = new Set([
   "notifications/initialized",
   "tools/list",
   "ping",
+  // Many MCP clients probe these right after initialize even when the server only
+  // advertises tools. Answering them with HTTP 401 made spec-following clients
+  // (Claude, Cursor, MCP SDK) start OAuth discovery and give up. Return empty lists.
+  "resources/list",
+  "resources/templates/list",
+  "prompts/list",
+  "logging/setLevel",
+  "completion/complete",
 ]);
 
 export function isPublicMcpMethod(method: unknown): boolean {
@@ -135,7 +143,17 @@ function legacyToolList() {
  */
 export function handlePublicMcpMethod(body: McpRequestBody): McpPublicResult | null {
   const method = body?.method;
+  // Any JSON-RPC notification (no id) is fire-and-forget: 202, never an auth error.
+  if (typeof method === "string" && method.startsWith("notifications/") && isJsonRpc(body)) {
+    return { kind: "accepted", status: 202 };
+  }
   if (!isPublicMcpMethod(method)) return null;
+
+  if (method === "resources/list") return { kind: "json", status: 200, body: rpcResult(body, { resources: [] }) };
+  if (method === "resources/templates/list") return { kind: "json", status: 200, body: rpcResult(body, { resourceTemplates: [] }) };
+  if (method === "prompts/list") return { kind: "json", status: 200, body: rpcResult(body, { prompts: [] }) };
+  if (method === "logging/setLevel") return { kind: "json", status: 200, body: rpcResult(body, {}) };
+  if (method === "completion/complete") return { kind: "json", status: 200, body: rpcResult(body, { completion: { values: [] } }) };
 
   if (method === "notifications/initialized") {
     return { kind: "accepted", status: 202 };
@@ -166,6 +184,11 @@ export function handlePublicMcpMethod(body: McpRequestBody): McpPublicResult | n
 }
 
 /** JSON-RPC tool result carrying an error the model can read and act on. */
+/** JSON-RPC "method not found" (HTTP 200) — used instead of HTTP 401 for unknown methods. */
+export function rpcMethodNotFound(body: McpRequestBody): unknown {
+  return { jsonrpc: "2.0", id: body.id ?? null, error: { code: -32601, message: `Method not found: ${String(body.method)}` } };
+}
+
 export function toolError(body: McpRequestBody, text: string, data?: unknown): unknown {
   return rpcResult(body, {
     isError: true,
