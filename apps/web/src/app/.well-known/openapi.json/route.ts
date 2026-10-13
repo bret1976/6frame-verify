@@ -86,10 +86,10 @@ export async function GET() {
       },
       "/v1/keys": {
         post: {
-          summary: "Self-serve API key from an email (shown once). Keyless. Rate limited per IP/email. Includes 1 free Quick Check/day.",
+          summary: "Self-serve API key (shown once). Keyless; no email needed (email optional). Rate limited per IP/email. Includes 1 free Quick Check/day.",
           requestBody: {
-            required: true,
-            content: { "application/json": { schema: { type: "object", required: ["email"], properties: { email: { type: "string", format: "email" } } } } },
+            required: false,
+            content: { "application/json": { schema: { type: "object", properties: { email: { type: "string", format: "email", description: "Optional" } } } } },
           },
           responses: { "201": { description: "Key created" }, "429": { description: "Rate limited" } },
         },

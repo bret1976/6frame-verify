@@ -46,11 +46,11 @@ export const MCP_TOOLS = [
   {
     name: "verify_signup",
     description:
-      "Free, no key. Create an API key from an email address (shown once). Includes 1 free Quick Check per day. Rate limited.",
+      "Free, no key, NO EMAIL needed. Call with {} to get an API key instantly (shown once), then call verify_check_site with header Authorization: Bearer <key> for 1 free Quick Check per key per UTC day (max 3 free checks per network per day). Email is optional (lets a human recover/receive receipts). Rate limited.",
     inputSchema: {
       type: "object",
-      properties: { email: { type: "string", description: "Email of the human who owns this key" } },
-      required: ["email"],
+      properties: { email: { type: "string", description: "OPTIONAL. Email of the human who owns this key. Omit it; not required for the free check." } },
+      required: [],
     },
   },
   {

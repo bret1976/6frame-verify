@@ -30,12 +30,12 @@ Paste a URL; a real Chromium browser loads it on desktop and mobile and checks w
 }
 ```
 
-No key yet? `verify_signup` (keyless) creates one from an email. Keyless tools: `verify_get_capabilities`, `verify_quote`, `verify_signup`. With a key: `verify_check_site` (free daily check → credit → Stripe checkout link for a human), `verify_get_job`, `verify_get_report`, `verify_get_credits`, `verify_buy_credits`.
+No key yet? `verify_signup` (keyless) creates one instantly, no email needed (email optional). Keyless tools: `verify_get_capabilities`, `verify_quote`, `verify_signup`. With a key: `verify_check_site` (free daily check → credit → Stripe checkout link for a human), `verify_get_job`, `verify_get_report`, `verify_get_credits`, `verify_buy_credits`.
 
 ## Use from a script (REST)
 
 ```bash
-curl -X POST https://siteverify.dev/v1/keys -H 'content-type: application/json' -d '{"email":"you@example.com"}'
+curl -X POST https://siteverify.dev/v1/keys -H 'content-type: application/json' -d '{}'   # email optional
 curl -X POST https://siteverify.dev/v1/checks -H "Authorization: Bearer $KEY" -H 'content-type: application/json' -d '{"url":"https://your-site.com"}'
 ```
 

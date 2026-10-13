@@ -18,7 +18,7 @@ export function serverCard(base: string) {
     authentication: {
       required: false,
       schemes: ["bearer"],
-      description: `Optional Authorization: Bearer fv_live_… key. Keyless tools: ${[...KEYLESS_TOOLS].join(", ")}. Free key via verify_signup or POST ${base}/v1/keys {email}.`,
+      description: `Optional Authorization: Bearer fv_live_… key. Keyless tools: ${[...KEYLESS_TOOLS].join(", ")}. Free key via verify_signup or POST ${base}/v1/keys {} (no email needed).`,
     },
     capabilities: { tools: { listChanged: false } },
     payments: (() => {

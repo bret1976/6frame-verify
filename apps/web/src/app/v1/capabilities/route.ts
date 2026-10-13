@@ -41,7 +41,7 @@ export async function GET(req: Request) {
       credits: "/v1/credits",
       credit_checkout: "/v1/credits/checkout",
     },
-    free_tier: { quick_checks_per_day_per_key: FREE_QUICK_CHECKS_PER_DAY, signup: "POST /v1/keys {email}" },
+    free_tier: { quick_checks_per_day_per_key: FREE_QUICK_CHECKS_PER_DAY, signup: "POST /v1/keys {} (email optional)", email_required: false },
     credits: {
       packs: SOLD_CREDIT_PACKS.map((sku) => ({ sku, ...CREDIT_PACKS[sku] })),
       buy: 'POST /v1/credits/checkout {"pack":"credit_pack_9"} (Idempotency-Key) → Stripe Checkout URL; balance added on verified webhook',

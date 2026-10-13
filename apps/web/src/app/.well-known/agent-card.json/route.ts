@@ -24,7 +24,7 @@ export async function GET() {
     },
     authentication: {
       schemes: ["Bearer"],
-      credentials: `fv_live_ API keys — self-serve: POST ${base}/v1/keys {email} or ${base}/get-key`,
+      credentials: `fv_live_ API keys — self-serve: POST ${base}/v1/keys {} (no email needed) or ${base}/get-key`,
     },
     defaultInputModes: ["application/json"],
     defaultOutputModes: ["application/json"],

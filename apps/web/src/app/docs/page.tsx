@@ -21,7 +21,7 @@ export default function DocsPage() {
       </p>
       <h2>1. Get a key</h2>
       <pre className="codeblock">{`curl -X POST ${base}/v1/keys -H "content-type: application/json" \\
-  -d '{"email":"you@example.com"}'`}</pre>
+  -d '{}'   # no email needed`}</pre>
       <h2>2. Run a check</h2>
       <pre className="codeblock">{`curl -X POST ${base}/v1/checks -H "Authorization: Bearer $KEY" \\
   -H "content-type: application/json" -d '{"url":"https://your-site.com"}'`}</pre>
