@@ -18,6 +18,7 @@ import {
   handlePublicMcpMethod,
   isJsonRpc,
   rpcResult,
+  rpcMethodNotFound,
   toolError,
   toolText,
   type McpRequestBody,
@@ -68,9 +69,45 @@ function rpcOut(body: McpRequestBody, payload: unknown) {
   return jsonOk(payload);
 }
 
+/** One structured line per MCP request so the funnel is measurable (no secrets, IP hashed). */
+function logMcp(req: Request, body: McpRequestBody, outcome: string) {
+  try {
+    const ip = clientIp(req);
+    let h = 0;
+    for (const c of `${process.env.RATE_LIMIT_SALT ?? "6fv"}:${ip}`) h = (h * 31 + c.charCodeAt(0)) | 0;
+    const tool = body?.method === "tools/call" ? String((body.params as { name?: unknown } | undefined)?.name ?? "") : undefined;
+    const ci = body?.method === "initialize" ? (body.params as { clientInfo?: { name?: string; version?: string } } | undefined)?.clientInfo : undefined;
+    console.info(
+      "[mcp]",
+      JSON.stringify({
+        m: body?.method ?? null,
+        tool,
+        client: ci ? `${ci.name ?? "?"}/${ci.version ?? "?"}` : undefined,
+        ua: (req.headers.get("user-agent") ?? "").slice(0, 120),
+        ip: (h >>> 0).toString(36),
+        key: req.headers.get("authorization") ? "yes" : "no",
+        out: outcome,
+      }),
+    );
+  } catch {
+    /* logging must never break MCP */
+  }
+}
+
 export async function POST(req: Request) {
-  await ensureStripeDeposit().catch(() => {});
   const body = ((await req.json().catch(() => ({}))) ?? {}) as McpRequestBody;
+  const res = await handlePost(req, body);
+  let outcome = String(res.status);
+  if (body?.method === "tools/call" && res.status === 200) {
+    const t = await res.clone().text().catch(() => "");
+    outcome = t.includes("Payment required") ? "402-x402" : t.includes('"isError":true') ? "tool_error" : "ok";
+  }
+  logMcp(req, body, outcome);
+  return res;
+}
+
+async function handlePost(req: Request, body: McpRequestBody): Promise<Response> {
+  await ensureStripeDeposit().catch(() => {});
 
   const pub = handlePublicMcpMethod(body);
   if (pub) {
@@ -135,6 +172,9 @@ export async function POST(req: Request) {
         }),
       );
     }
+    // Never answer a JSON-RPC MCP request with HTTP 401: clients treat it as "OAuth required"
+    // and abort the connection. Unknown methods get a normal JSON-RPC error instead.
+    if (isJsonRpc(body)) return jsonOk(rpcMethodNotFound(body));
     return unauthorized("MCP tools/call requires Bearer fv_live_ API key");
   }
 
@@ -196,7 +236,12 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Streamable HTTP clients open GET with Accept: text/event-stream for server push.
+  // We have no server->client stream: spec answer is 405, not a JSON 200 (SDK errors on that).
+  if ((req.headers.get("accept") ?? "").includes("text/event-stream")) {
+    return new Response(null, { status: 405, headers: { Allow: "POST", "Cache-Control": "no-store" } });
+  }
   return jsonOk({
     name: "6frame-verify",
     transport: "streamable-http",

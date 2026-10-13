@@ -19,7 +19,7 @@ const rpc = (method: string, params?: unknown, id: number | undefined = 1) =>
 test("only discovery methods are public", () => {
   assert.deepEqual(
     [...PUBLIC_MCP_METHODS].sort(),
-    ["initialize", "notifications/initialized", "ping", "tools/list"].sort(),
+    ["initialize", "notifications/initialized", "ping", "tools/list", "resources/list", "resources/templates/list", "prompts/list", "logging/setLevel", "completion/complete"].sort(),
   );
   assert.equal(isPublicMcpMethod("tools/call"), false);
   assert.equal(isPublicMcpMethod(undefined), false);
@@ -101,8 +101,21 @@ test("tools/call with a malformed key → tool error with signup link", async ()
   assert.equal(j.result.isError, true);
 });
 
-test("unknown method / empty body without a key → 401", async () => {
-  assert.equal((await POST(rpc("resources/list", {}, 5))).status, 401);
+test("unknown JSON-RPC method without a key → 200 -32601 (never 401); non-JSON-RPC empty body → 401", async () => {
+  const r = await POST(rpc("foo/bar", {}, 5));
+  assert.equal(r.status, 200);
+  assert.equal(((await r.json()) as { error: { code: number } }).error.code, -32601);
+  assert.equal((await POST(rpc("resources/list", {}, 6))).status, 200);
   const empty = new Request(URL_, { method: "POST", body: "{}" });
   assert.equal((await POST(empty)).status, 401);
+});
+
+test("resources/prompts list are public and never 401 (clients probe them after initialize)", () => {
+  for (const [m, k] of [["resources/list", "resources"], ["prompts/list", "prompts"], ["resources/templates/list", "resourceTemplates"]] as const) {
+    const r = handlePublicMcpMethod({ jsonrpc: "2.0", id: 7, method: m });
+    assert.ok(r && r.kind === "json" && r.status === 200);
+    assert.deepEqual((r as { body: { result: Record<string, unknown> } }).body.result[k], []);
+  }
+  const n = handlePublicMcpMethod({ jsonrpc: "2.0", method: "notifications/cancelled" });
+  assert.ok(n && n.kind === "accepted");
 });
