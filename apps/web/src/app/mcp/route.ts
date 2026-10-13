@@ -72,7 +72,8 @@ function rpcOut(body: McpRequestBody, payload: unknown) {
 /** One structured line per MCP request so the funnel is measurable (no secrets, IP hashed). */
 function logMcp(req: Request, body: McpRequestBody, outcome: string) {
   try {
-    const ip = clientIp(req);
+    // Log the original client (first X-Forwarded-For hop); the last hop is Railway's edge.
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || clientIp(req);
     let h = 0;
     for (const c of `${process.env.RATE_LIMIT_SALT ?? "6fv"}:${ip}`) h = (h * 31 + c.charCodeAt(0)) | 0;
     const tool = body?.method === "tools/call" ? String((body.params as { name?: unknown } | undefined)?.name ?? "") : undefined;
@@ -158,7 +159,7 @@ async function handlePost(req: Request, body: McpRequestBody): Promise<Response>
       resource: `${baseUrl()}/mcp#verify_check_site`,
       anonymous: true,
     });
-    if (out.status === 402) return rpcOut(body, toolError(body, "Payment required — pay autonomously with x402 (USDC), or use an API key", out.body));
+    if (out.status === 402) return rpcOut(body, toolError(body, "Payment required ($3). Two ways forward: (1) FREE: call verify_signup with an email to get an API key that includes 1 free Quick Check per day, then call verify_check_site again with header Authorization: Bearer <key>; or (2) pay autonomously with x402 (USDC on Base) using accepts[] below and retry with argument x402_payment.", out.body));
     if (out.status >= 400) return rpcOut(body, toolError(body, "Check not started", out.body));
     return rpcOut(body, toolText(body, out.body));
   }
